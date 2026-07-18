@@ -39,7 +39,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 ### Phase 0 — Foundation
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P1 | Repo scaffold + database | ⬜ | | |
+| P1 | Repo scaffold + database | ⚠️ | Thiru | **built, NOT verified** — containers never run |
 | P2 | Synthetic data generator ★ | ⬜ | | |
 | P3 | Ingest + CrimeNo parsing | ⬜ | | |
 | P4 | Translation layer | ⬜ | | |
@@ -106,7 +106,10 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 
 | Date | Decision | Why | By |
 |---|---|---|---|
-| | | | |
+| 2026-07-18 | Two Postgres schemas: `ksp` (source, read-only) and `derived` (computed) | Keeps the supplied schema pristine and makes all derived work droppable/rebuildable. `brief_facts_en` lives in `derived.case_translation`, never in `ksp.case_master`. | Thiru |
+| 2026-07-18 | snake_case table/column names, original PascalCase recorded in SQL `COMMENT` | Postgres folds unquoted identifiers to lowercase anyway, so `CaseMaster` → `casemaster` regardless. Comments keep the mapping to the source diagram explicit. | Thiru |
+| 2026-07-18 | `ArrestSurrender.accused_master_id` kept but marked deprecated; junction table authoritative | The diagram has both. One arrest event can cover multiple accused, so the junction is the only structure that can represent reality. **Revisit if organisers say otherwise.** | Thiru |
+| 2026-07-18 | Added `gender_master` (INFERRED-3) | `GenderID` is referenced as a "lookup value" by four tables but no lookup table is defined. Seeded M/F/T per the diagram's own description. | Thiru |
 
 ---
 
@@ -164,3 +167,30 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-18 · Thiru · P1
+```
+Did:      Full scaffold. backend/ + frontend/ as separate Docker services,
+          docker-compose with healthcheck-gated startup, Makefile.
+          db/init/*.sql: 29 ksp tables + 4 derived tables. Every deviation
+          from the ER diagram marked [FIX-n] / [INFERRED-n] inline — nothing
+          changed silently. 8 acceptance tests in backend/tests/test_schema.py.
+          Directory tree laid out for all 33 prompts.
+
+Works:    Nothing verified at runtime. Python files compile; SQL parens
+          balance; table counts correct (29 ksp / 4 derived).
+
+Broken:   NOT RUN. The postgis image pull was still going when we stopped —
+          no container has ever started, the schema has never been loaded, and
+          the tests have never executed. Treat P1 as unfinished until someone
+          runs `make up && make test` and sees it pass. Expect at least one
+          typo in 425 lines of untested DDL.
+
+Next:     Whoever picks this up: run `make reset` first, fix whatever the DDL
+          gets wrong, then flip P1 to ✅ in the status table above. Only then
+          start P2.
+
+          Open question that blocks P7 later: inv_arrest_surrender_accused is
+          INFERRED — its real column structure is unknown and collective
+          entity resolution depends on it. Chase the organisers.
+```
