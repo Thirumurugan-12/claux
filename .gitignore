@@ -1,0 +1,36 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Data — never commit crime records
+data/
+*.csv
+*.xlsx
+*.parquet
+!db/seed/*.csv
+
+# Generated
+backend/ingest/synth/ground_truth*.json
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
