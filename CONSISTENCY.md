@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P1 | Thiru | main | 2026-07-18 | scaffold + DDL — in progress |
+| P2 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | synthetic generator + ground truth |
 
 ---
 
@@ -39,8 +39,8 @@ Who is working on what, right now. Clear your row when you finish or stop.
 ### Phase 0 — Foundation
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P1 | Repo scaffold + database | ⚠️ | Thiru | **built, NOT verified** — containers never run |
-| P2 | Synthetic data generator ★ | ⬜ | | |
+| P1 | Repo scaffold + database | ✅ | Thiru | verified: schema loads clean, 29 ksp / 4 derived, 8/8 tests pass |
+| P2 | Synthetic data generator ★ | 🟡 | Claude | in progress |
 | P3 | Ingest + CrimeNo parsing | ⬜ | | |
 | P4 | Translation layer | ⬜ | | |
 | P4a | External socio-economic data | ⬜ | | closes PS1 §4 |
@@ -167,6 +167,32 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-18 · Claude (Thiru) · P1 verify, P2 claim
+```
+Did:      Verified P1 for real. No docker daemon in this environment, so brought
+          up the host's Postgres 16 cluster directly, installed postgis + pgvector
+          via apt, created the ksp role/db, and loaded all three db/init/*.sql in
+          order under ON_ERROR_STOP=1. Loads clean. 29 ksp + 4 derived tables,
+          exactly as designed. Ran the pytest suite: 8/8 green.
+
+          Fixed one real defect: test_cs_type_constrained_to_known_outcomes did a
+          deliberately-failing INSERT on a module-scoped connection and never rolled
+          back, so the aborted transaction cascaded two FALSE failures into the next
+          two tests. Added conn.rollback() after the expected failure. The schema
+          itself was never wrong — all assertions pass on a clean connection.
+
+Works:    `pytest tests/` → 8 passed. DDL applies with zero errors. postgis +
+          vector + pg_trgm + fuzzystrmatch all present. party_role enum =
+          {accused, victim, complainant}. Section has a PK. act_section_association
+          codes are VARCHAR. P1 is now genuinely ✅.
+
+Broken:   Nothing in P1. Note the verification path was host Postgres, not
+          `docker compose` — the daemon isn't available here. DDL is identical, so
+          this validates the schema; it does not validate the compose wiring itself.
+
+Next:     Building P2 (synthetic generator) next — claimed on the board.
+```
 
 ### 2026-07-18 · Thiru · P1
 ```
