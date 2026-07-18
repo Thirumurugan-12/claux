@@ -86,6 +86,9 @@ def test_cs_type_constrained_to_known_outcomes(conn):
             )
         )
         conn.commit()
+    # The failed INSERT aborts the transaction on this module-scoped connection.
+    # Roll back so following tests don't inherit an aborted transaction.
+    conn.rollback()
 
 
 def test_accused_is_not_a_person_identifier(conn):
