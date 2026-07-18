@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P2 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | synthetic generator + ground truth |
+| _(none active)_ | | | | P1 verified ✅, P2 built ✅ — P3/P5/P9 are free |
 
 ---
 
@@ -40,7 +40,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
 | P1 | Repo scaffold + database | ✅ | Thiru | verified: schema loads clean, 29 ksp / 4 derived, 8/8 tests pass |
-| P2 | Synthetic data generator ★ | 🟡 | Claude | in progress |
+| P2 | Synthetic data generator ★ | ✅ | Claude | `python -m ingest.synth --cases N`; ground truth → gitignored json |
 | P3 | Ingest + CrimeNo parsing | ⬜ | | |
 | P4 | Translation layer | ⬜ | | |
 | P4a | External socio-economic data | ⬜ | | closes PS1 §4 |
@@ -120,10 +120,13 @@ most valuable one in the file** — put anything here that would waste the other
 
 | Date | Finding | Impact | By |
 |---|---|---|---|
-| | | | |
-
-Expect entries here about: `latitude`/`longitude` null rate, `AccusedName` formats nobody
-documented, the two undefined tables, `BriefFacts` language mix, `cstype` class balance.
+| 2026-07-18 | **These are SYNTHETIC-data characteristics (P2), not real-data findings.** They stand in until the real dataset lands, and they are what the generator deliberately produces so downstream code has realistic signal to handle. | ER/tools should be built against these shapes | Claude |
+| 2026-07-18 | `latitude`/`longitude` ~58% null. Non-null points are district-centroid + jitter. | P13 hotspot code MUST implement the centroid fallback + precise/inferred flag from day one. | Claude |
+| 2026-07-18 | `accused_name` formats: honorifics (Sri/Smt/Mr/Kum), `@` aliases, patronymic present ~55% of the time, terminal-vowel drift (Chandru/Chandruu/Chandrua/Chandruappa), transliteration noise (sh↔s, th↔t, doubled letters). One true person can look like 40+ distinct strings. | This is exactly what P5 name parsing + P6 scoring must see through. Don't assume a clean given/patronymic split. | Claude |
+| 2026-07-18 | `BriefFacts` language mix ≈ 45% English / 30% transliterated Kannada / 25% Kannada script. Each MO template keeps signature words stable across all three renderings. | P4 translation + P15 MO clustering both rely on this. `mo_by_case` in the ground-truth file is the P15 answer key. | Claude |
+| 2026-07-18 | `cstype` class balance on closed cases ≈ A 36% / B 10% / C 54%. ~23% of all cases are still OPEN (no chargesheet_details row) — those are the P16 prediction targets. | P16 has a usable but imbalanced label; ~11.6k open cases at 50k scale. | Claude |
+| 2026-07-18 | Age drifts ±2y per appearance around the person's true birth year — the ±2y tolerance in PLAN.md §2 stage 4 is calibrated to exactly this. | P6 age-consistency gate should use ±2y (a tighter gate will drop true matches). | Claude |
+| 2026-07-18 | Co-arrest junction: one `arrest_surrender` event covers up to 4 accused; gangs (300 at 50k scale) recur across cases. Zero-FIR (cat 8) ≈ 4%, UDR (cat 3) present. | P7 collective boost and P12 community detection have real edges; P13 zero-FIR flow tool has data. | Claude |
 
 ---
 
@@ -192,6 +195,43 @@ Broken:   Nothing in P1. Note the verification path was host Postgres, not
           this validates the schema; it does not validate the compose wiring itself.
 
 Next:     Building P2 (synthetic generator) next — claimed on the board.
+```
+
+### 2026-07-18 · Claude (Thiru) · P2
+```
+Did:      Built the synthetic FIR generator under ingest/synth/. Real Karnataka
+          geography (31 districts + centroids), police org, and a legal framework
+          covering exactly the acts/sections the crime catalogue invokes. 11 crime
+          types, each with gravity, section mapping, a realistic cstype distribution,
+          and MO-signature BriefFacts written in English / transliterated Kannada /
+          Kannada script. Hidden ground-truth registry: gangs, repeat offenders, and
+          victim-offender duals, with every party row traced back to a true person.
+          COPY-based loader. CLI: `python -m ingest.synth --cases N`.
+
+Works:    `python -m ingest.synth --cases 50000` — generates in ~6s, loads in ~10s.
+          Verified on the loaded 50k: 0 date-ordering violations, 0 CrimeNo integrity
+          violations (incl. district segment == station's district), lat/long 58% null,
+          cstype A/B/C = 36/10/54%, 11.6k open cases, 1,697 chargesheet-deadline-band
+          cases, co-arrest events up to 4 accused, 0 FK orphans. `pytest` → 17 passed
+          (9 new generator invariant tests, no DB needed). ruff clean.
+
+          Concrete proof it works: true person #126 "Chandru Marappa" surfaces 43x as
+          Chandruu / Chhandru / Chandrua / Chandruanna / Chandruappa / Mr Chandru S/o
+          Maranna ... age wandering 49-57. That is the ER problem, made measurable.
+
+Broken:   Nothing. Two notes for whoever does ER:
+          - The generator is separable from the DB (build() returns row tuples), so you
+            can unit-test against it without Postgres.
+          - The single-person appearance tail is heavy for gang members (some 40+). If
+            that skews your F1, cap gang recurrence via RegistryConfig — don't edit the
+            per-appearance corruption, it's calibrated to PLAN.md §2.
+
+Next:     P3 (ingest/loader.py + CrimeNo parser + quality report) can run against this
+          data now. P5 (name parsing) is the ★ gate for ER and is unblocked — the name
+          corruption in names.py is exactly what it has to reverse. P9 (tool framework)
+          is independent and parallelizable. See the Data surprises table for the shapes
+          to build against. Ground truth is at backend/ingest/synth/ground_truth.json
+          (gitignored) — the ER pipeline must NEVER read it; only P8 evaluation may.
 ```
 
 ### 2026-07-18 · Thiru · P1
