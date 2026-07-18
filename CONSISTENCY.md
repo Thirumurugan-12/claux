@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1 verified ✅, P2 built ✅ — P3/P5/P9 are free |
+| P5 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | name parsing + normalization + phonetic key |
 
 ---
 
@@ -48,7 +48,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 ### Phase 1 — Entity resolution
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P5 | Name parsing + normalization ★ | ⬜ | | |
+| P5 | Name parsing + normalization ★ | 🟡 | Claude | in progress |
 | P6 | Blocking + pairwise scoring | ⬜ | | |
 | P7 | Collective resolution ★ | ⬜ | | |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
