@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| UI upgrade (bento grid) | Claude (Opus) | feature/frontend-design | 2026-07-19 | Bento-grid layout upgrade; no backend/contract changes |
+| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅ + UI/UX redesign ✅ + bespoke revision & FE refactor ✅ + bento-grid UI upgrade ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
 
 ---
 
@@ -1029,4 +1029,82 @@ Broken:   Nothing. Notes:
 Next:     Unchanged: P20 upgrades the SVG panes to Cytoscape/MapLibre — the new token names
           (--accent/--link/--heat, .graph-node/.graph-edge/.map-hotspot classes) are the
           colours to carry over. P16→P17→P17a→P20→P25 remains the demo path.
+```
+
+### 2026-07-19 · Claude (Opus) · UI upgrade (bento grid)
+```
+Did:      Reorganised the frontend layout around a BENTO GRID and added tile primitives.
+          ZERO backend/contract change: /api/* paths, request/response JSON, SSE parsing,
+          and every wire type in src/api/ are byte-for-byte identical — presentation only.
+
+          WHY BENTO (over the two other options offered):
+          - For a data-dense operational/analytics console judged by government stakeholders,
+            a bento grid gives modern structure, clear information hierarchy, and a premium
+            dashboard feel without hurting legibility.
+          - Neumorphism was rejected: low-contrast extruded surfaces fail AA and read dated.
+          - Heavy glassmorphism/liquid-glass was rejected across data surfaces: translucency
+            over maps/graphs/evidence muddies text. Kept as ONE restrained accent only —
+            a subtle backdrop blur on the drawer scrim (with the solid --overlay-scrim as the
+            fallback), never on a data pane.
+
+          LAYOUT: the old two-column workspace (chat | tabbed panes) is now a 3-tile bento of
+          intentional, varied sizes on a recessed --canvas:
+            - tile-chat     : tall PRIMARY tile spanning both rows (left) — the conversation.
+            - tile-session  : compact context tile (top-right) — NEW. Shows the active RBAC
+                              principal + scope (moved out of the top bar to avoid duplicating
+                              the role switcher) plus live signals from the last answer:
+                              Tools run / FIRs cited / Rows examined (or a red Denied count
+                              when a tool was refused). Tabular mono numerals.
+            - tile-analysis : large tile (bottom-right) — the existing Evidence/Network/Map
+                              tabbed pane, with the tab strip now serving as the tile header.
+          Responsive: 2-col reflows to a slightly tighter split ≤1080px, then collapses to a
+          single scrolling column ≤900px (chat 62vh, analysis 72vh) — reflows, doesn't break.
+
+          NEW PRIMITIVES / COMPONENTS:
+            - components/Tile.tsx      — the reusable bento tile (header slot: `title`+`actions`
+                                         OR a custom `head` node like the tab strip; body slot
+                                         with `tile-flow`/`tile-pad` variants). Everything is
+                                         composed from this, so radii/hairlines/elevation stay
+                                         consistent.
+            - features/layout/SessionPanel.tsx — the context tile (memoised signal summary over
+                                         toolCalls; reuses the Pill primitive for the role badge).
+          WIRED: ChatPane and Workspace now render inside <Tile>; App composes the three tiles
+          under <main className="bento">; TopBar dropped its scope Pill (now in the Session tile).
+
+          TOKENS ADDED (index.css): --r-tile (10px), --bento-gap (12px), --tile-head-h (44px),
+          and per-theme --tile-shadow (restrained: a hairline does the real work, the shadow
+          only lifts the tile off the canvas) + --canvas (recessed bento background, one step
+          below --bg in both themes). Tiles are --surface on the --canvas so hairline + subtle
+          elevation read as separate designed surfaces. No rainbow strips, no glows, no
+          everything-rounded — the de-AI'd register from the last pass is preserved.
+
+          A11y: tiles are <section aria-label>; icon buttons keep aria-labels; focus-visible
+          gold rings unchanged; the glass note has a solid fallback and text never sits on blur;
+          motion additions are none beyond existing (all still under prefers-reduced-motion).
+
+Works:    All run this pass, all green:
+          - `npx tsc --noEmit` → clean.
+          - `npm run lint` (tsc --noEmit && eslint .) → clean, 0 errors / 0 warnings.
+          - `npm run format` then `npm run format:check` → all files match Prettier.
+          - `npm run build` (tsc -b && vite build) → clean; 71 modules, index.js 166.94 kB
+            (gzip 54.17) + index.css 62.32 kB (gzip 26.43), fonts bundled offline. ~0.4s.
+          - `docker compose build frontend` (repo root) → RAN and SUCCEEDED (elevated perms;
+            image ksp-crime-intelligence-frontend:latest built/unpacked). Repo root clean —
+            no stray root-level package-lock.json.
+
+Broken:   Nothing. Notes:
+          - Behaviour/contracts untouched: streaming chat + inline tool chips, role switch
+            remounts chat with a new principal (RBAC demo), evidence CrimeNo chips → CaseDrawer
+            via POST /api/case incl. honest 403, network/map SVG panes from extractGraph/
+            extractGeo, ask→panes-repaint linkage, 503 LLM banner. Dark default + light toggle
+            + localStorage persistence (ksp-theme) all preserved. Chat still needs the LLM
+            configured (UNIAI_* or LLM_PROVIDER=anthropic); the tiles/evidence/role-switch/
+            case-drawer work regardless.
+          - Scope readout moved from the top bar into the Session tile (control vs. status
+            split) — a deliberate de-duplication, not a lost feature.
+          - Code left UNCOMMITTED per the task; only this log + the earlier claim commit went in.
+
+Next:     Unchanged: P20 upgrades the SVG panes to Cytoscape/MapLibre inside the existing
+          tile-analysis tile (drop-in — the tile header/body slots stay). P16→P17→P17a→P20→P25
+          remains the demo path.
 ```
