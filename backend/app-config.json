@@ -1,0 +1,7 @@
+{
+  "command": "python serve.py",
+  "build_path": ".",
+  "stack": "python_3_12",
+  "memory": 1024,
+  "catalyst_auth": false
+}

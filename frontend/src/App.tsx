@@ -1,57 +1,127 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  DemoRole,
+  extractGeo,
+  extractGraph,
+  fetchDemoRoles,
+  GeoData,
+  GraphData,
+  Principal,
+  ToolCall,
+} from "./api";
+import ChatPane from "./components/ChatPane";
+import EvidencePane from "./components/EvidencePane";
+import NetworkGraph from "./components/NetworkGraph";
+import HotspotMap from "./components/HotspotMap";
+import CaseDrawer from "./components/CaseDrawer";
 
-/**
- * P1 placeholder. Verifies the frontend container can reach the backend
- * through the Vite proxy. The real four-pane shell lands in P19.
- */
-
-type DbHealth = {
-  status: string;
-  postgres?: string;
-  postgis?: string;
-  ksp_tables?: number;
-  derived_tables?: number;
-  detail?: string;
-};
+type Tab = "evidence" | "network" | "map";
 
 export default function App() {
-  const [health, setHealth] = useState<DbHealth | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<DemoRole[]>([]);
+  const [roleIdx, setRoleIdx] = useState(0);
+  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [tab, setTab] = useState<Tab>("evidence");
+  const [openCase, setOpenCase] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/health/db")
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch((e) => setError(String(e)));
+    // default to SP — a district officer who can see people, networks, and trends in scope
+    fetchDemoRoles()
+      .then((r) => {
+        setRoles(r);
+        const sp = r.findIndex((x) => x.role === "sp");
+        if (sp >= 0) setRoleIdx(sp);
+      })
+      .catch(() => setRoles([]));
   }, []);
 
+  const current: DemoRole | null = roles[roleIdx] ?? null;
+  const principal: Principal = current?.principal ?? { name: "SP", role: "sp" };
+
+  const { graph, geo } = useMemo(() => {
+    let g: GraphData | null = null;
+    let ge: GeoData | null = null;
+    for (const tc of toolCalls) {
+      g = g ?? extractGraph(tc);
+      ge = ge ?? extractGeo(tc);
+    }
+    return { graph: g, geo: ge };
+  }, [toolCalls]);
+
+  function onAnswer(tcs: ToolCall[]) {
+    setToolCalls(tcs);
+    // surface the most visual result: network > map > evidence
+    if (tcs.some(extractGraph)) setTab("network");
+    else if (tcs.some(extractGeo)) setTab("map");
+    else setTab("evidence");
+  }
+
+  useEffect(() => {
+    // when the role changes, reset the panes (fresh RBAC context)
+    setToolCalls([]);
+    setTab("evidence");
+    setOpenCase(null);
+  }, [roleIdx]);
+
   return (
-    <main className="shell">
-      <h1>KSP Crime Intelligence Platform</h1>
-      <p className="sub">Karnataka State Police · SCRB — Datathon 2026</p>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          KSP Crime Intelligence
+          <span className="sub">Karnataka State Police · SCRB</span>
+        </div>
+        <div className="spacer" />
+        {current && <span className="role-scope">{current.scope}</span>}
+        <div className="role-switcher">
+          <label htmlFor="role">Acting as</label>
+          <select
+            id="role"
+            value={roleIdx}
+            onChange={(e) => setRoleIdx(Number(e.target.value))}
+            disabled={!roles.length}
+          >
+            {roles.map((r, i) => (
+              <option value={i} key={r.role}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      </header>
 
-      <section className="panel">
-        <h2>System status</h2>
-        {error && <p className="err">Backend unreachable: {error}</p>}
-        {!health && !error && <p className="muted">Checking…</p>}
-        {health && (
-          <dl>
-            <dt>Backend</dt>
-            <dd className={health.status === "ok" ? "ok" : "err"}>{health.status}</dd>
-            <dt>Postgres</dt>
-            <dd>{health.postgres ?? "—"}</dd>
-            <dt>PostGIS</dt>
-            <dd>{health.postgis ?? "—"}</dd>
-            <dt>ksp tables</dt>
-            <dd>{health.ksp_tables ?? "—"}</dd>
-            <dt>derived tables</dt>
-            <dd>{health.derived_tables ?? "—"}</dd>
-          </dl>
-        )}
-        {health?.detail && <p className="err">{health.detail}</p>}
-      </section>
+      <div className="workspace">
+        <ChatPane key={principal.role} principal={principal} onAnswer={onAnswer} />
 
-      <p className="muted next">Next: P2 — synthetic data generator.</p>
-    </main>
+        <div className="pane-col">
+          <div className="tabs">
+            <button className={tab === "evidence" ? "active" : ""} onClick={() => setTab("evidence")}>
+              Evidence
+            </button>
+            <button className={tab === "network" ? "active" : ""} onClick={() => setTab("network")}>
+              Network{graph && <span className="badge">●</span>}
+            </button>
+            <button className={tab === "map" ? "active" : ""} onClick={() => setTab("map")}>
+              Map{geo && <span className="badge">●</span>}
+            </button>
+          </div>
+
+          <div className="pane">
+            {tab === "evidence" && <EvidencePane toolCalls={toolCalls} onOpenCase={setOpenCase} />}
+            {tab === "network" &&
+              (graph ? <NetworkGraph graph={graph} /> : (
+                <div className="empty">Ask about a person's network or co-offending groups —
+                  the graph renders here.</div>
+              ))}
+            {tab === "map" &&
+              (geo ? <HotspotMap geo={geo} /> : (
+                <div className="empty">Run a hotspot scan — the map renders here, honest about
+                  precise vs inferred coverage.</div>
+              ))}
+          </div>
+        </div>
+      </div>
+
+      {openCase && (
+        <CaseDrawer crimeNo={openCase} principal={principal} onClose={() => setOpenCase(null)} />
+      )}
+    </div>
   );
 }

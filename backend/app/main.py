@@ -1,6 +1,6 @@
 """FastAPI entrypoint.
 
-P1 provides health checks only. The chat endpoint and tool registry land in P14.
+Health checks (P1) plus the /chat orchestration API (P14).
 """
 
 import logging
@@ -8,6 +8,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes import router as chat_router
 from app.config import get_settings
 from app.db import check_connection
 
@@ -16,17 +17,20 @@ logging.basicConfig(level=settings.log_level)
 
 app = FastAPI(
     title="KSP Crime Intelligence Platform",
-    description="Conversational AI and crime analytics over the Karnataka State Police FIR database",
+    description="Conversational AI and crime analytics over the Karnataka State Police FIR data",
     version="0.1.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    # configurable so the Catalyst Slate frontend origin can be added in production
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(chat_router)
 
 
 @app.get("/health")

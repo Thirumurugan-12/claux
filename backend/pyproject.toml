@@ -12,6 +12,17 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "python-dotenv>=1.0",
+    # entity resolution (P5+): transliteration, phonetics, string similarity, graph
+    "indic-transliteration>=2.3",
+    "metaphone>=0.6",
+    "jellyfish>=1.1",
+    "networkx>=3.3",
+    # trends/hotspots (P13) + ML layer (P15/16/18): DBSCAN, clustering, models
+    "scikit-learn>=1.5",
+    # orchestration loop (P14): the direct-Anthropic client path
+    "anthropic>=0.40",
+    # Catalyst UniAI / OpenAI-compatible gateway client (the demo-default LLM path)
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
@@ -40,3 +51,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+# FastAPI's Depends()/Query()/etc. are designed to be used as argument defaults; B008
+# (function call in default) is a false positive for that idiom.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]

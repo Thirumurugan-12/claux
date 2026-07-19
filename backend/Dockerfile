@@ -20,4 +20,7 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# serve.py binds X_ZOHO_CATALYST_LISTEN_PORT when present (Zoho Catalyst AppSail custom
+# runtime), else 8000 — the same image works in compose and on Catalyst. Note Catalyst
+# accepts OCI images built for linux/amd64 only. Dev reload is added by docker-compose.
+CMD ["python", "serve.py"]

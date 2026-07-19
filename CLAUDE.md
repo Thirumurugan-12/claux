@@ -62,13 +62,22 @@ treats `AccusedMasterID` as a stable person identity is a bug.
 
 ## Stack
 
-- Postgres 16 + PostGIS + pgvector (single database covers relational, geo, vector)
+- **Hosting: Zoho Catalyst** (hackathon platform partner — maximize its use). Backend on
+  AppSail, frontend on Slate, alerts on Job Scheduling, PDFs via SmartBrowz, files on
+  Stratus. See `DEPLOYMENT-CATALYST.md` for the full mapping and env vars.
+- Postgres 16 + PostGIS + pgvector (single database covers relational, geo, vector) —
+  runs **external to Catalyst** (compose / managed PG): ZCQL has no recursive CTEs,
+  PostGIS, pgvector, or pg_trgm, all of which the ER/RBAC/geo core requires
 - Graph: **networkx in-memory**, not Neo4j — datathon scale, renders identically, no sync
 - FastAPI + Pydantic (tool params are Pydantic models)
-- LLM: `claude-opus-4-8` for orchestration, `claude-sonnet-5` for bulk jobs
+- LLM: **Catalyst QuickML LLM Serving** (Qwen 2.5, BYOK, OpenAI-compat wire format,
+  `LLM_PROVIDER=uniai`, default). Tool calling defaults to `prompted` mode (JSON-protocol
+  in-prompt — works on any model, incl. a Qwen deployment with no native tool API); flip
+  `UNIAI_TOOL_MODE=native` if the endpoint supports OpenAI tools. Direct Anthropic
+  (`claude-opus-4-8`) is a local-comparison fallback only.
 - Frontend: React + Vite, MapLibre/deck.gl (map), Cytoscape.js (network graph)
 - Language: Bhashini (MeitY) for Kannada ASR/TTS
-- PDF: WeasyPrint
+- PDF: Catalyst SmartBrowz (WeasyPrint fallback)
 
 ## Layout
 

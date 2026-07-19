@@ -7,6 +7,7 @@ this project is treating accused_master_id as a stable person ID.
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.db import engine
 
@@ -22,6 +23,7 @@ KSP_TABLES = {
 
 DERIVED_TABLES = {
     "person_cluster", "person_cluster_member", "er_review_queue", "case_translation",
+    "audit_log",
 }
 
 
@@ -79,13 +81,16 @@ def test_fix2_section_has_primary_key(conn):
 
 def test_cs_type_constrained_to_known_outcomes(conn):
     """cs_type is our only supervised label — a typo here silently corrupts P16."""
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):  # ck_cs_type CHECK rejects anything but A/B/C
         conn.execute(
             text(
                 "INSERT INTO ksp.chargesheet_details (cs_id, cs_type) VALUES (-1, 'X')"
             )
         )
         conn.commit()
+    # The failed INSERT aborts the transaction on this module-scoped connection.
+    # Roll back so following tests don't inherit an aborted transaction.
+    conn.rollback()
 
 
 def test_accused_is_not_a_person_identifier(conn):
