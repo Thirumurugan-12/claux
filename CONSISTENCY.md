@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P10 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | retrieval tools (get_case/person/search/timeline) |
+| _(none active)_ | | | | P1,P2,P5–P11 ✅ (Phase 1 + core of Phase 2 tools). P14 orchestration is the merge point |
 
 ---
 
@@ -48,7 +48,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
 | §5 | Offender profiling (MO, risk) | 🔴 not started | P15 MO, P16 undetected-risk, P17 offender-risk — ER foundation ready to build on |
-| §6 | Investigator support (summaries, similar cases, leads) | 🔴 not started | P10a, P15, P17 |
+| §6 | Investigator support (summaries, similar cases, leads) | 🟡 partial | P10✅ (get_case/person/timeline/chargesheet). P10a case-summary, P15 similar-cases, P17 leads ⬜ |
 | §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
 | §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
 | §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain (P9) + reasoning viz (P19b) ⬜ |
@@ -88,7 +88,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 |---|---|---|---|---|
 | P9 | Tool framework ★ | ✅ | Claude | `app/tools/base.py`; RBAC+provenance+audit+k-anon, 2 demo tools |
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
-| P10 | Retrieval tools | 🟡 | Claude | in progress |
+| P10 | Retrieval tools | ✅ | Claude | `app/tools/retrieval.py`; get_person reads person_cluster (resolved profiles) |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
 | P11 | Compliance tools | ✅ | Claude | `app/tools/compliance.py`; deadline board (148 heinous day-75+) + reg-delay |
 | P12 | Network tools | ⬜ | | |
@@ -516,4 +516,42 @@ Next:     P10 (retrieval tools: get_case, search_cases, get_person via person_cl
           person_cluster is now populated + measured so get_person can return the resolved
           cross-FIR profile. P12 (network tools) also unblocked. P14 (orchestration) is the
           merge point once a few retrieval tools exist. Recommend P10 next.
+```
+
+### 2026-07-18 · Claude (Thiru) · P10
+```
+Did:      Built app/tools/retrieval.py — the 6 retrieval tools (get_case, search_cases,
+          get_person, search_persons, get_case_timeline, get_chargesheet_status) on the
+          P9 framework. get_person is the important one: resolved profile across ALL
+          linked FIRs via person_cluster/person_cluster_member (NEVER accused_master_id
+          as identity), with per-link confidence. catalog.build_registry() now has 9
+          real tools; retired the demo get_case.
+
+Works:    pytest tests/tools/ -> 31 passed (12 new). Live: get_person on a 34-FIR
+          offender ("Raju S/o Venkatappa", written Venkatanna/Venkatappa/Wenkatappa)
+          returns the cross-FIR profile; an SP of one district sees 4 in-scope FIRs,
+          30 hidden out-of-scope. get_case links accused -> person_cluster_id. Timeline
+          shows incident->info->registered->arrest(51d)->chargesheet(89d). Full suite 95,
+          ruff clean.
+
+Broken:   Nothing. One GOVERNANCE tension to flag for P14/demo (not a bug):
+          get_person/search_persons are person_level, so analyst/policymaker (state,
+          aggregate-only) are DENIED, and SP/DySP/SHO are scope-limited to their units.
+          Net effect: NO role can see a repeat offender's FULL cross-district profile
+          with person-level detail. That's correct per PLAN §6, but the flagship demo
+          beat ("same person across a dozen stations") needs a principal whose scope
+          actually spans those stations. For the demo, use an SP/DySP whose district/
+          subtree contains the seeded offender's FIRs, OR consider (P25) seeding the
+          demo repeat-offender within ONE district's stations. If a "state investigator"
+          role that sees person-level state-wide is wanted, add it to base.Role +
+          the scope/PERSON_TOOL_DISABLED sets — but that's a policy decision, don't do
+          it silently.
+
+Next:     P14 (orchestration ★) is now the high-leverage merge point: 9 tools exist
+          (retrieval + compliance), person_cluster is populated. P14 = FastAPI /chat +
+          the Claude tool-calling loop over catalog.build_registry(), system prompt
+          enforcing "never author a fact", streaming, provenance chain, eval set incl.
+          unanswerable questions. That makes the whole thing demoable end-to-end.
+          Alternatively P12 (network tools) or P13 (trends) to widen the catalogue first.
+          Recommend P14.
 ```
