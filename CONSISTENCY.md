@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅ + UI/UX redesign ✅ + bespoke revision & FE refactor ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
+| UI upgrade (bento grid) | Claude (Opus) | feature/frontend-design | 2026-07-19 | Bento-grid layout upgrade; no backend/contract changes |
 
 ---
 
