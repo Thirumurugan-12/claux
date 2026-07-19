@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P13,P14 ✅ + Catalyst pivot ✅. 19 tools live in /chat. Next: P13a (events/anomaly) or P19 UI (Slate). |
+| P19 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Frontend shell (frontend/): dark operational 3-pane UI, streaming chat, evidence drawer w/ clickable CrimeNos, role switcher (RBAC demo). Lightweight SVG network+map panes (P20 upgrades to Cytoscape/MapLibre). |
 
 ---
 
