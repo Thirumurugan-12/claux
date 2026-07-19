@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P8 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | ER evaluation harness (F1 + collective lift) |
+| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ P7✅ P8✅ — Phase 1 ER DONE. P7a or P9 next |
 
 ---
 
@@ -42,7 +42,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | PS1 § | Feature | Status | Where / what's left |
 |---|---|---|---|
 | — | **Foundation** (DB, synthetic data) | 🟢 built | P1✅ P2✅. P3 ingest/quality-report ⬜, P4 translation ⬜ |
-| — | **Entity resolution core** (`person_cluster`) | 🟢 built | P5✅ P6✅ P7✅. **The hard/novel part is done.** P8 F1 metric ⬜ |
+| — | **Entity resolution core** (`person_cluster`) | 🟢 built + measured | P5✅ P6✅ P7✅ P8✅. **Phase 1 done.** B-cubed F1 **0.687** (P 0.83 / R 0.59), pairwise F1 0.372, collective lift **+887** merges vs name-only. |
 | §1 | Conversational AI interface | 🔴 not started | needs P9 tools + P14 orchestration + P19 UI |
 | §2 | Network / link analysis | 🟡 foundation only | co-offending graph + clusters exist (P7); P7a victim overlap ⬜, P12 network tools ⬜ |
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
@@ -81,7 +81,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P6 | Blocking + pairwise scoring | ✅ | Claude | `er/blocking.py`+`er/scoring.py`; 55k accused→4.58M pairs in ~30s |
 | P7 | Collective resolution ★ | ✅ | Claude | `er/resolve.py`; person_cluster populated, +237 collective lift |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
-| P8 | ER evaluation harness | 🟡 | Claude | in progress |
+| P8 | ER evaluation harness | ✅ | Claude | `python -m er.run_evaluate`; B-cubed F1 0.687, +887 collective merges |
 
 ### Phase 2 — Tool layer and chat
 | | Prompt | Status | By | Notes |
@@ -407,4 +407,43 @@ Next:     P8 (er/evaluate.py) is the direct next step and produces the F1 for th
           reuse ResolveConfig(max_rounds=1, boost_per_cooffender=0) for the off case, or
           diff base vs final. P7a extends resolution to victims/complainants (same
           person_cluster namespace) for the victim-offender overlap.
+```
+
+### 2026-07-18 · Claude (Thiru) · P8
+```
+Did:      Built er/evaluate.py + er/run_evaluate.py — the ER scorecard vs P2's hidden
+          ground truth. Pairwise + B-cubed P/R/F1, an error breakdown (which corruption
+          appears in missed true pairs), and the collective lift (propagation off vs on).
+          Refactored resolve into prepare() + resolve_prepared() so eval scores the
+          working set ONCE and clusters twice. CLI: `python -m er.run_evaluate`.
+
+Works:    On 55,716 accused: B-cubed F1 = 0.687 (P 0.826 / R 0.588), pairwise F1 = 0.372.
+          Predicted 4,395 multi-member clusters vs 4,013 true recurring people — close.
+          Collective lift = +887 auto-merges from the network (pairwise F1 +0.008).
+          Ground-truth coverage 100% (json matches the loaded seed-42 50k data). Top
+          recall-loss factors in missed pairs: cross_district (10%), missing_patronymic
+          (7%), age_drift>2 (3%). pytest -> 64 passed (7 new). ruff clean.
+          Re-persisted person_cluster with the tuned weights (35,122 clusters).
+
+Broken:   Nothing broken. IMPORTANT — the harness caught a real defect and I fixed it:
+          the OLD weights (name .35/patro .30/age .15/geo .10) meant a repeat offender
+          with same name+father+age but a DIFFERENT district scored 0.80 and never
+          auto-merged — the flagship "same person across stations" case was landing in
+          review. Old recall was catastrophic (pairwise 0.035, B-cubed 0.47). Rebalanced
+          so core identity (name .40/patro .35/age .20) clears 0.85 on its own; geo+alias
+          are bonuses; bare name+age (no patronymic) still stays <0.60. Recall jumped
+          (B-cubed 0.47->0.59) at a modest precision cost (0.97->0.83). Net F1 up on both
+          metrics. THIS IS THE DEFAULT NOW — if you retune, re-run run_evaluate and watch
+          BOTH precision and recall; the tiny 68-name pool makes it easy to over-merge.
+
+          Perf note: run_evaluate takes ~120s (scores 4.58M pairs once, clusters twice,
+          builds pairwise pair-sets). It's an offline harness, not a demo path.
+
+Next:     Phase 1 (entity resolution) is COMPLETE and measured. Options:
+          - P7a: resolve victims/complainants into the SAME person_cluster namespace
+            (victim-offender overlap tool). P2 planted dual-role people for this.
+          - P9 (tool framework ★) starts Phase 2 — independent of remaining ER, unblocks
+            the whole tool/chat/demo spine. Highest leverage toward a demoable product.
+          Recommend P9 next: person_cluster now exists + is measured, so the retrieval/
+          network tools (P10/P12) that read it have a real, scored foundation.
 ```
