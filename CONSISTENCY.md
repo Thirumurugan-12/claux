@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| Catalyst pivot (P14b) | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Hackathon partner requirement: host on Zoho Catalyst, LLM via Catalyst UniAI (BYOK) instead of a direct Anthropic key. AppSail backend + Slate frontend + OpenAI-compat gateway client. |
+| _(none active)_ | | | | P1,P2,P5–P11,P14 ✅ + Catalyst pivot ✅. LLM defaults to Catalyst UniAI (BYOK); hosting mapped in DEPLOYMENT-CATALYST.md. Next: P12/P13 tools or P19 UI (deployable to Slate). |
 
 ---
 
@@ -141,6 +141,9 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 | 2026-07-18 | Added `gender_master` (INFERRED-3) | `GenderID` is referenced as a "lookup value" by four tables but no lookup table is defined. Seeded M/F/T per the diagram's own description. | Thiru |
 | 2026-07-18 | ER scorer: patronymic-**mismatch penalty** (both present but jw<0.80 ⇒ −0.30), beyond PLAN §2 stage 4's positive-only signals | PLAN treats patronymic as a positive weight only. On the small synthetic pool (68 given / 24 patronymic names) two different people share a given name constantly, and a differing father's name is the strongest evidence they're *different*. Without the penalty, all the "Anand"s transitively over-merged. Thresholds measured on P2 (corrupted-same ≥0.886, different ≤0.75). | Claude |
 | 2026-07-18 | ER clustering: **cannot-link constraints** in union-find (conflicting patronymic phonetic key, or cluster birth-year span > 5y), beyond PLAN §2 stage 6's plain threshold clustering | Naive transitive closure at ≥0.85 fuses distinct people via a single borderline bridge edge. `est_birth_year = reg_year − age` is ~constant per person (±2 age noise) so it's discriminative; the patronymic *key* separates Marappa(MR) from Mallappa(ML) while keeping Marappa/Maranna together. Reduced the largest cluster 62→24. **Revisit on real data** — with thousands of distinct names these collisions are rare and the constraints could be relaxed. | Claude |
+| 2026-07-19 | **Hosting pivots to Zoho Catalyst** (hackathon platform partner): AppSail (backend), Slate (frontend), Job Scheduling (P17a), SmartBrowz (P24 PDF), Stratus (exports). See `DEPLOYMENT-CATALYST.md`. | Partner requirement — maximize Catalyst usage. PLAN.md's generic docker-compose hosting stays as the local dev path; compose is unchanged for `make up`. | Claude |
+| 2026-07-19 | **Postgres stays EXTERNAL to Catalyst** — not migrated to Catalyst Data Store | Verified against Catalyst's own agent-skills docs: Data Store/ZCQL has no recursive CTEs (RBAC unit-subtree scope), no PostGIS (geo), no pgvector (semantic search), no pg_trgm (fuzzy match). The ER core is unimplementable on it. Everything above the DB is Catalyst. | Claude |
+| 2026-07-19 | **LLM default provider = Catalyst UniAI** (BYOK gateway) via a new `OpenAICompatClient`; direct Anthropic (`claude-opus-4-8`) demoted to alternate path (`LLM_PROVIDER=anthropic`) | User can paste the key issued in the Catalyst console and demo — no Anthropic account needed. UniAI's wire format is NOT publicly documented (403s + absent from Catalyst's agent-skills as of 2026-07-19); client assumes the OpenAI chat-completions shape gateways expose, with `UNIAI_CHAT_PATH`/`UNIAI_AUTH_SCHEME` knobs. **Must verify with `run_eval --live` the day the real key arrives.** Tool/function calling is REQUIRED of whatever model is picked in UniAI. | Claude |
 
 ---
 
@@ -254,6 +257,52 @@ Next:     The chat spine is demoable end-to-end. Highest-leverage next:
             this, so an unquestioned tool fails the suite).
           - P19 (frontend shell) can consume /chat + /chat/stream now.
           Recommend P13 next (trends close PS1 §3, currently 🔴) then P19 for a visible demo.
+```
+
+### 2026-07-19 · Claude (Thiru) · Catalyst pivot (hosting + LLM provider)
+```
+Did:      Repointed hosting + LLM requirements at Zoho Catalyst (hackathon platform
+          partner; user wants Catalyst maximized and a Catalyst-console key to power
+          the demo instead of an Anthropic key).
+          - app/api/llm.py: OpenAICompatClient — speaks OpenAI chat-completions wire
+            format (incl. tool calling) over httpx against Catalyst UniAI or any
+            compatible gateway. Translates our internal Anthropic-block message list
+            to the OpenAI shape per request and maps responses back, so the
+            orchestrator/tools/eval are provider-agnostic and UNTOUCHED.
+            client_from_settings() dispatches on LLM_PROVIDER (uniai default |
+            anthropic); routes.get_llm_client and run_eval --live both use it.
+          - config.py: LLM_PROVIDER + UNIAI_BASE_URL/API_KEY/MODEL/CHAT_PATH/
+            AUTH_SCHEME (bearer | zoho-oauthtoken) + CORS_ORIGINS (for the Slate
+            frontend origin). compose passes them all through.
+          - serve.py + app-config.json + Dockerfile CMD: AppSail-ready. serve.py binds
+            X_ZOHO_CATALYST_LISTEN_PORT (AppSail kills instances not bound in 10s),
+            falls back to 8000 so compose/dev is unchanged (compose adds --reload).
+            app-config.json = python_3_12, 1024MB, no env_variables (deliberate — the
+            linked-app redeploy would DELETE console-set secrets not listed there).
+          - DEPLOYMENT-CATALYST.md: full service mapping (AppSail/Slate/Job
+            Scheduling/SmartBrowz/Stratus/Cache/Auth), 3 deploy flows, env var table.
+          - CLAUDE.md stack section updated to match.
+
+Works:    pytest -> 119 passed (10 new in tests/api/test_uniai_client.py, all offline
+          via httpx.MockTransport: auth schemes, message/tool translation both
+          directions, finish_reason=tool_calls -> stop_reason=tool_use, error paths,
+          and a full orchestrator round-trip over a fake gateway hitting the real
+          registry/RBAC/provenance). ruff clean. App boots, provider default = uniai.
+
+Broken:   Nothing in code, but ONE UNVERIFIED ASSUMPTION, flagged in the decision
+          table: UniAI's wire format. Zoho docs 403 to fetchers and Catalyst's own
+          agent-skills repo (checked 2026-07-19) documents no LLM gateway API, so the
+          client targets the de-facto OpenAI-compatible gateway shape with CHAT_PATH/
+          AUTH_SCHEME as escape hatches. THE MOMENT a real UniAI key exists, run:
+            UNIAI_BASE_URL=... UNIAI_API_KEY=... UNIAI_MODEL=... \
+              python -m app.api.run_eval --live
+          28-case eval + multi-turn transcript against the live gateway. If the shape
+          differs, fix ONLY OpenAICompatClient. Also: the chosen UniAI model MUST
+          support function calling or the whole tool loop is dead — check first.
+
+Next:     Unchanged from P14: P12/P13 to widen the tool catalogue, or P19 (frontend,
+          now with a Slate deployment target). Whoever does P24 (PDF): SmartBrowz
+          first, WeasyPrint fallback. P17a: use Catalyst Job Scheduling, not cron.
 ```
 
 ### 2026-07-18 · Claude (Thiru) · P1 verify, P2 claim
