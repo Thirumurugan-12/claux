@@ -86,6 +86,8 @@ def test_cs_type_constrained_to_known_outcomes(conn):
             )
         )
         conn.commit()
+    # Intentional error aborts the shared transaction — clear it for later tests.
+    conn.rollback()
 
 
 def test_accused_is_not_a_person_identifier(conn):

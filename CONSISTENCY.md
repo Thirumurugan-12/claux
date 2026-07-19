@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P1 | Thiru | main | 2026-07-18 | scaffold + DDL — in progress |
+| | | | | |
 
 ---
 
@@ -39,7 +39,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 ### Phase 0 — Foundation
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P1 | Repo scaffold + database | ⚠️ | Thiru | **built, NOT verified** — containers never run |
+| P1 | Repo scaffold + database | ✅ | Venkatesan | verified: `make reset` + 8/8 schema tests pass |
 | P2 | Synthetic data generator ★ | ⬜ | | |
 | P3 | Ingest + CrimeNo parsing | ⬜ | | |
 | P4 | Translation layer | ⬜ | | |
@@ -106,6 +106,7 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 
 | Date | Decision | Why | By |
 |---|---|---|---|
+| 2026-07-19 | Custom `db/Dockerfile` on top of `postgis/postgis:16-3.4` that `apt install`s `postgresql-16-pgvector` | Stock PostGIS image has no `vector` extension; init aborted on `CREATE EXTENSION vector` and left 0 tables. | Venkatesan |
 | 2026-07-18 | Two Postgres schemas: `ksp` (source, read-only) and `derived` (computed) | Keeps the supplied schema pristine and makes all derived work droppable/rebuildable. `brief_facts_en` lives in `derived.case_translation`, never in `ksp.case_master`. | Thiru |
 | 2026-07-18 | snake_case table/column names, original PascalCase recorded in SQL `COMMENT` | Postgres folds unquoted identifiers to lowercase anyway, so `CaseMaster` → `casemaster` regardless. Comments keep the mapping to the source diagram explicit. | Thiru |
 | 2026-07-18 | `ArrestSurrender.accused_master_id` kept but marked deprecated; junction table authoritative | The diagram has both. One arrest event can cover multiple accused, so the junction is the only structure that can represent reality. **Revisit if organisers say otherwise.** | Thiru |
@@ -193,4 +194,27 @@ Next:     Whoever picks this up: run `make reset` first, fix whatever the DDL
           Open question that blocks P7 later: inv_arrest_surrender_accused is
           INFERRED — its real column structure is unknown and collective
           entity resolution depends on it. Chase the organisers.
+```
+
+### 2026-07-19 · Venkatesan · P1
+```
+Did:      Brought a fresh clone up locally. Started Docker Desktop, created
+          .env from .env.example. Fixed DB image: stock postgis/postgis:16-3.4
+          lacks pgvector, so init died on CREATE EXTENSION vector and left
+          empty schemas. Added db/Dockerfile that installs postgresql-16-pgvector
+          and pointed compose at it. Fixed test_cs_type_constrained_to_known_outcomes
+          to rollback after the intentional failed INSERT (was poisoning the
+          module-scoped connection for the two tests after it).
+
+Works:    make reset → 29 ksp + 4 derived tables. /health/db ok.
+          Frontend http://localhost:5173 → 200. make test → 8/8 passed.
+          DDL itself was clean — no schema typos.
+
+Broken:   ANTHROPIC_API_KEY still blank in .env (fine until chat/orchestration).
+          postgis base is linux/amd64; on Apple Silicon it runs under emulation
+          (works, just slower). Optional later: multi-arch db image.
+
+Next:     P1 is ✅. P2 (synthetic data generator) is unblocked. Code changes
+          for the db Dockerfile / compose / test rollback are local — commit
+          them before starting P2 so the other machine can make up cleanly.
 ```

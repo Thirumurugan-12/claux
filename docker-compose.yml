@@ -2,7 +2,9 @@ name: ksp-crime-intelligence
 
 services:
   db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: ./db
+    image: ksp-crime-intelligence-db
     container_name: ksp_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ksp}
