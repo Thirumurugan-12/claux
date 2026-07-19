@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P14,P19 ✅ + Catalyst pivot ✅. 19 tools + chat UI. Next: P20 (MapLibre/Cytoscape upgrade) or P15 (MO, sklearn ready). |
+| P15 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | MO fingerprinting (ml/mo/): TF-IDF→SVD→HDBSCAN over brief_facts, pgvector storage, get_mo_cluster + find_similar_cases (with cstype outcomes). Lexical (no torch) — env-constrained; measured vs mo_by_case GT. |
 
 ---
 
