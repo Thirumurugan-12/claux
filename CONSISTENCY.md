@@ -143,7 +143,8 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 | 2026-07-18 | ER clustering: **cannot-link constraints** in union-find (conflicting patronymic phonetic key, or cluster birth-year span > 5y), beyond PLAN §2 stage 6's plain threshold clustering | Naive transitive closure at ≥0.85 fuses distinct people via a single borderline bridge edge. `est_birth_year = reg_year − age` is ~constant per person (±2 age noise) so it's discriminative; the patronymic *key* separates Marappa(MR) from Mallappa(ML) while keeping Marappa/Maranna together. Reduced the largest cluster 62→24. **Revisit on real data** — with thousands of distinct names these collisions are rare and the constraints could be relaxed. | Claude |
 | 2026-07-19 | **Hosting pivots to Zoho Catalyst** (hackathon platform partner): AppSail (backend), Slate (frontend), Job Scheduling (P17a), SmartBrowz (P24 PDF), Stratus (exports). See `DEPLOYMENT-CATALYST.md`. | Partner requirement — maximize Catalyst usage. PLAN.md's generic docker-compose hosting stays as the local dev path; compose is unchanged for `make up`. | Claude |
 | 2026-07-19 | **Postgres stays EXTERNAL to Catalyst** — not migrated to Catalyst Data Store | Verified against Catalyst's own agent-skills docs: Data Store/ZCQL has no recursive CTEs (RBAC unit-subtree scope), no PostGIS (geo), no pgvector (semantic search), no pg_trgm (fuzzy match). The ER core is unimplementable on it. Everything above the DB is Catalyst. | Claude |
-| 2026-07-19 | **LLM default provider = Catalyst UniAI** (BYOK gateway) via a new `OpenAICompatClient`; direct Anthropic (`claude-opus-4-8`) demoted to alternate path (`LLM_PROVIDER=anthropic`) | User can paste the key issued in the Catalyst console and demo — no Anthropic account needed. UniAI's wire format is NOT publicly documented (403s + absent from Catalyst's agent-skills as of 2026-07-19); client assumes the OpenAI chat-completions shape gateways expose, with `UNIAI_CHAT_PATH`/`UNIAI_AUTH_SCHEME` knobs. **Must verify with `run_eval --live` the day the real key arrives.** Tool/function calling is REQUIRED of whatever model is picked in UniAI. | Claude |
+| 2026-07-19 | **LLM = Catalyst QuickML LLM Serving** (Qwen 2.5, BYOK) via `OpenAICompatClient`; direct Anthropic (`claude-opus-4-8`) demoted to local-comparison fallback (`LLM_PROVIDER=anthropic`) | Catalyst is the ONLY permitted cloud, so the LLM must be Catalyst's own. QuickML LLM Serving is the concrete native offering (Qwen models, POST endpoint + Zoho OAuth). "UniAI" turned out not to be a findable Catalyst component; kept the `UNIAI_*` env-var names as the generic "Catalyst LLM endpoint" config to avoid churn. Wire format assumed OpenAI-compatible (undocumented; verify with `run_eval --live`), with `UNIAI_CHAT_PATH`/`UNIAI_AUTH_SCHEME` knobs. | Claude |
+| 2026-07-19 | **Tool calling defaults to `prompted` mode**, not native OpenAI `tools` | Whether QuickML's serving endpoint exposes OpenAI function-calling is undocumented and can't be assumed — the entire loop depends on tool selection. `prompted` injects the tool catalogue + a strict JSON protocol (`{"tool":...}` / `{"final":...}`) into the system prompt and parses the reply, so the loop runs on ANY chat model incl. a plain Qwen deployment. `UNIAI_TOOL_MODE=native` is available when the endpoint supports tools (better quality). | Claude |
 
 ---
 
@@ -303,6 +304,45 @@ Broken:   Nothing in code, but ONE UNVERIFIED ASSUMPTION, flagged in the decisio
 Next:     Unchanged from P14: P12/P13 to widen the tool catalogue, or P19 (frontend,
           now with a Slate deployment target). Whoever does P24 (PDF): SmartBrowz
           first, WeasyPrint fallback. P17a: use Catalyst Job Scheduling, not cron.
+```
+
+### 2026-07-19 · Claude (Thiru) · Catalyst LLM = QuickML serving + prompted tool mode
+```
+Did:      Follow-up to the Catalyst pivot after the constraint got sharper: Catalyst is
+          the ONLY cloud, so the LLM must be Catalyst-native. Researched Catalyst's AI
+          surface — the concrete hosted-LLM offering is QuickML LLM Serving (Qwen 2.5,
+          POST endpoint + Zoho OAuth). No component literally named "UniAI" is findable
+          in Catalyst docs / agent-skills; kept UNIAI_* env names as generic config.
+          - Reoriented OpenAICompatClient to target QuickML serving; added a two-mode
+            tool-calling design because QuickML tool-calling support is undocumented:
+              * prompted (NEW DEFAULT): tool catalogue + strict JSON protocol injected
+                into the system prompt, reply parsed into a tool call or final answer.
+                Tool results are fed back as "TOOL RESULT: <json>" user text (no
+                role:"tool"). Works with ANY chat model — the loop runs on a plain Qwen
+                with zero native tool API. Tolerant parser (strips ``` fences, extracts
+                the {...}, degrades to a plain answer if non-JSON).
+              * native: OpenAI tools/tool_calls, for endpoints that support it.
+          - config: UNIAI_TOOL_MODE (default prompted); compose passes it through.
+          - Docs: DEPLOYMENT-CATALYST.md LLM section rewritten (QuickML endpoint, Zoho
+            OAuth, prompted-vs-native, day-one run_eval --live); CLAUDE.md stack line.
+
+Works:    pytest -> 126 passed (7 new: prompted-mode catalogue injection, JSON tool-call
+          parse, final-answer + code-fence tolerance, non-JSON degrade, tool_result-as-
+          text rendering, bad-mode rejection, AND a full orchestrator round-trip in
+          prompted mode over a fake Qwen — no native tools, real registry/RBAC/
+          provenance). Existing native-path tests pinned to tool_mode="native". ruff
+          clean. Default provider=uniai, default tool_mode=prompted.
+
+Broken:   Nothing. Same standing caveat: QuickML serving's exact request/response body is
+          unverified (assumed OpenAI-shaped). Day the model+key exist, run
+          `python -m app.api.run_eval --live` with UNIAI_AUTH_SCHEME=zoho-oauthtoken.
+          If native tool calling works there, set UNIAI_TOOL_MODE=native for quality.
+          Note QuickML/AutoML is region-limited (not in EU/AU/IN/JP/SA/CA per Catalyst
+          docs) — confirm the hackathon DC has it, else the fallback is another Catalyst
+          OpenAI-compatible endpoint with the same client.
+
+Next:     Unchanged: P12/P13 tools or P19 UI (Slate). No LLM work remains until a real
+          Catalyst model endpoint is available to run the live eval against.
 ```
 
 ### 2026-07-18 · Claude (Thiru) · P1 verify, P2 claim
