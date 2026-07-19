@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| UI/UX bespoke revision + FE refactor | Claude (Opus) | feature/frontend-design | 2026-07-19 | De-AI design pass + modularization/lint; no backend/contract changes |
+| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅ + UI/UX redesign ✅ + bespoke revision & FE refactor ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
 
 ---
 
@@ -931,4 +931,102 @@ Next:     P20 upgrades the SVG panes to MapLibre/Cytoscape — the new palette t
           (--gold/--kaveri/--heat, node/edge classes) are the intended colours to carry over.
           A native-speaker pass on Kannada templates (P22) can now rely on the Noto Sans
           Kannada pairing already wired into the body font stack.
+```
+
+### 2026-07-19 · Claude (Opus) · UI/UX revision + FE refactor
+```
+Did:      Second design pass — the first redesign was verdict'd "still looks AI-generated /
+          vibe-coded". Rebuilt the presentation into a bespoke operational console AND
+          refactored frontend/src for real engineering hygiene. ZERO backend/contract change:
+          /api/* paths, request/response JSON, SSE parsing, and all wire types are byte-for-
+          byte identical (api.ts was only reorganised into modules, not altered on the wire).
+
+          STACK CORRECTION (was a live confusion): the frontend is **React 18 + Vite + TS**,
+          NOT Next.js. No framework migration; none needed or wanted.
+
+          DE-AI DESIGN (what removed the "AI smell", index.css full rewrite):
+          - Killed the tells: the gold→terracotta→teal rainbow accent strips (top bar +
+            drawer), the Kasuti motif stamped onto the top bar / every card / every empty
+            state, the gradient emblem plate, the radial-gradient "glows" behind the SVG
+            panes and viz backgrounds, drop-shadows on cards/bubbles, the infinite pulse
+            badges, and the everything-is-a-pill radii. These are the generic templated
+            choices that read as vibe-coded.
+          - Replaced with an opinionated system: one dominant calm surface (cool graphite
+            near-black canvas, NOT the previous warm "sandalwood" tint), structure carried by
+            crisp 1px hairlines instead of shadows/gradients, and gold used SPARINGLY as a
+            signal only (active tab underline, focus ring, primary send button, tab data-dot,
+            seed graph node, the FIR number in the drawer). Terracotta strictly = heat/danger;
+            teal = links/interactive. Deliberate small radii (4/6/9px), a real 4px spacing
+            grid, a tightened type scale (11–24, dropped the 40px display), tabular mono for
+            all IDs/counts/metrics.
+          - Chat is now an analyst transcript, not a symmetric two-bubble messenger: user
+            queries are compact right-aligned blocks, assistant answers are full-width prose
+            with a quiet label + an inline "Traced" tool-chip row. This asymmetry is the
+            single biggest "not-a-chatbot-template" move.
+          - Heritage kept as exactly ONE restrained detail x2: the line-only Kasuti stepped-
+            diamond brand glyph, and a single thin engraved rule (one diamond) as the empty-
+            state divider. Nothing else is themed.
+          - Real states throughout: hover/active/focus-visible (gold rings), streaming cursor,
+            busy spinner in the send button, teaching empty states, error banner (role=alert),
+            disabled states; motion is subtle and under a prefers-reduced-motion guard.
+            A11y: semantic landmarks (header/main/aside/section/footer), aria-labels on all
+            icon-only buttons, Enter-to-send, Esc-closes-drawer, AA-minded contrast.
+
+          MODULAR REFACTOR (Part B — was one flat components/ dir + a monolithic api.ts):
+          New src/ tree:
+            api/         client.ts (fetch/SSE), types.ts (all wire types), extract.ts
+                         (tool→pane narrowing, the only place that knows tool payload shapes),
+                         index.ts barrel
+            hooks/       useTheme, useDemoRoles, useChatStream (owns streaming/history/patch
+                         logic that used to live inside ChatPane), usePaneData (the App memo)
+            components/  presentational primitives: icons, IconButton, Chip, Pill, Tabs,
+                         EmptyState, KeyValue, Drawer, ThemeToggle
+            features/    chat/ (ChatPane, ChatMessage, ChatComposer, ToolTrace, suggestions),
+                         evidence/ (EvidencePane, ProvenanceCard), network/ (NetworkGraph),
+                         map/ (HotspotMap), roles/ (RoleSwitcher), case/ (CaseDrawer),
+                         layout/ (TopBar, StatusBar, Workspace)
+            lib/         constants.ts (magic numbers lifted: theme key, history limit, graph/
+                         map dims + bbox, chip caps), format.ts (count/humanize/errorMessage)
+          App.tsx is now a thin composition (~50 lines) of hooks + feature components. Views
+          are declarative; side-effect/stateful logic lives in hooks. Types tightened: the old
+          `data?: any` / `e: any` are gone — ToolData = Record<string,unknown> narrowed via
+          guards in extract.ts, CaseRecord/AccusedRef typed for the drawer, errors handled as
+          unknown. No implicit any. Removed the unused `@/*` tsconfig path alias (dead config).
+
+          TOOLING ADDED (was: "lint" = just tsc): ESLint 9 flat config (@eslint/js +
+          typescript-eslint + react-hooks + react-refresh + eslint-config-prettier) and
+          Prettier, both standard/minimal. Scripts: typecheck (tsc), lint (tsc && eslint .),
+          format / format:check. Added frontend/.dockerignore (node_modules/dist/.git) — the
+          Dockerfile's `COPY . .` runs AFTER `npm install`, so without it a host node_modules
+          (now present because we install locally) would clobber the image's Linux modules.
+
+          FONTS unchanged set but trimmed to used weights only (Outfit 600 wordmark; Inter
+          400/500/600; JetBrains Mono 400/500/600; Noto Sans Kannada 400/500) — still bundled
+          via @fontsource, no CDN. No new runtime deps; SVG panes stayed SVG.
+
+Works:    All run this pass, all green:
+          - `npx tsc --noEmit` → clean.
+          - `npm run lint` (tsc --noEmit && eslint .) → clean, 0 errors/0 warnings.
+          - `npm run format:check` → all files match Prettier.
+          - `npm run build` (tsc -b && vite build) → clean; index.js 165.13 kB (gzip 53.68) +
+            index.css 59.87 kB (gzip 25.89), fonts bundled as woff/woff2. Built in ~0.4s.
+          - `docker compose build frontend` (repo root) → RAN and SUCCEEDED (needed elevated
+            perms; the sandboxed `docker info` reports the daemon down but it's reachable
+            unsandboxed, same as last pass). `npm install` in-image added 181 pkgs, 0 vulns,
+            image ksp-crime-intelligence-frontend:latest built.
+
+Broken:   Nothing. Notes:
+          - Behaviour/contracts untouched: streaming chat + inline tool chips, role switch
+            remounts chat with a new principal (RBAC demo), evidence CrimeNo chips → CaseDrawer
+            via POST /api/case incl. honest 403, network/map SVG panes from extractGraph/
+            extractGeo, ask→panes-repaint linkage, 503 LLM banner. Dark default + light toggle
+            + localStorage persistence (ksp-theme) all preserved.
+          - `make lint` runs `npm run lint`, which is now tsc + eslint (was tsc only) — a
+            strict improvement, still passes. Chat still needs the LLM configured (UNIAI_* or
+            LLM_PROVIDER=anthropic); panes/evidence/role-switch/case-drawer work regardless.
+          - Code left UNCOMMITTED per the task; only this log + the earlier claim commit went in.
+
+Next:     Unchanged: P20 upgrades the SVG panes to Cytoscape/MapLibre — the new token names
+          (--accent/--link/--heat, .graph-node/.graph-edge/.map-hotspot classes) are the
+          colours to carry over. P16→P17→P17a→P20→P25 remains the demo path.
 ```
