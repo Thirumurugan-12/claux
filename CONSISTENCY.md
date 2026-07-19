@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P12 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Network tools (app/tools/network.py): person-level co-offending graph over person_cluster + inv_arrest_surrender_accused. get_person_network / find_shortest_path / detect_communities (Louvain, cross-jurisdiction flag) / get_repeat_offenders. Cytoscape-ready, cached graph. |
+| _(none active)_ | | | | P1,P2,P5–P12,P14 ✅ + Catalyst pivot ✅. 13 tools live in /chat. Next: P13 (trends, §3) or P19 UI (Slate). |
 
 ---
 
@@ -44,7 +44,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | — | **Foundation** (DB, synthetic data) | 🟢 built | P1✅ P2✅. P3 ingest/quality-report ⬜, P4 translation ⬜ |
 | — | **Entity resolution core** (`person_cluster`) | 🟢 built + measured | P5✅ P6✅ P7✅ P8✅. **Phase 1 done.** B-cubed F1 **0.687** (P 0.83 / R 0.59), pairwise F1 0.372, collective lift **+887** merges vs name-only. |
 | §1 | Conversational AI interface | 🟡 backend live | P9 tools + **P14 orchestration ✅** (POST /chat, tool-calling loop, provenance chain, refusal path). P19 UI ⬜ |
-| §2 | Network / link analysis | 🟡 foundation only | co-offending graph + clusters exist (P7); P7a victim overlap ⬜, P12 network tools ⬜ |
+| §2 | Network / link analysis | 🟢 built | **P12 ✅** — person_network / shortest_path / communities (Louvain, cross-jurisdiction flag) / repeat_offenders over the resolved-person graph. P7a victim overlap ⬜ (extends to victims). |
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
 | §5 | Offender profiling (MO, risk) | 🔴 not started | P15 MO, P16 undetected-risk, P17 offender-risk — ER foundation ready to build on |
@@ -91,7 +91,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P10 | Retrieval tools | ✅ | Claude | `app/tools/retrieval.py`; get_person reads person_cluster (resolved profiles) |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
 | P11 | Compliance tools | ✅ | Claude | `app/tools/compliance.py`; deadline board (148 heinous day-75+) + reg-delay |
-| P12 | Network tools | ⬜ | | |
+| P12 | Network tools | ✅ | Claude | `app/tools/network.py`; person-level co-offending graph, 4 tools, Cytoscape-ready, cross-jurisdiction detection |
 | P13 | Trend + hotspot tools | ⬜ | | |
 | P13a | Event calendar + anomaly detection | ⬜ | | closes PS1 §3 |
 | P14 | Orchestration loop ★ | ✅ | Claude | `app/api/`; POST /chat + tool-calling loop over catalog, 28/28 eval, injectable LLM client |
@@ -205,6 +205,50 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-19 · Claude (Thiru) · P12
+```
+Did:      Built app/tools/network.py — the 4 network tools (PLAN §3 tools 7–10) over a
+          PERSON-level co-offending graph. Nodes = person_cluster_id (resolved accused
+          people), edges = co-arrest via ksp.inv_arrest_surrender_accused, weighted by
+          shared-event count. Distinct from er/graph.py (which is per-FIR accused rows
+          for collective resolution) — this builds ON the resolution it produced.
+          - get_person_network: depth-limited ego graph (BFS-capped at max_nodes).
+          - find_shortest_path: shortest co-offending chain between two people.
+          - detect_communities: Louvain (seed=42), flags groups spanning >1 police
+            station (the flagship — cross-jurisdiction gangs invisible to one station).
+          - get_repeat_offenders: prolific offenders by linked-FIR count + co-offender
+            degree.
+          Graph is built once and cached (get_person_graph / reset_person_graph). All
+          outputs Cytoscape.js-ready {nodes, edges} for P20. All person_level=True.
+
+Works:    Graph builds in ~1.6s: 35,122 nodes / 13,477 co-offending edges. pytest
+          tests/tools/test_network.py -> 13 passed (graph build, real co-offender edge,
+          cache reuse, ego graph, out-of-scope + no-record denials, shortest path deg=1,
+          community cross-jurisdiction consistency + filter, repeat-offender sort/
+          threshold, analyst denial, deterministic build). Registered in catalog (13
+          tools now). Added 4 eval questions -> run_eval 32/32 offline. Full suite 139
+          passed, ruff clean.
+
+Broken:   Nothing. Notes:
+          - RBAC = induced subgraph on people with >=1 FIR in the caller's units (same
+            rule as get_person, lifted to the graph). So a single SHO can't see cross-
+            jurisdiction; a DySP/SP over a multi-station subtree CAN — that's the intended
+            line and what makes the cross-jurisdiction demo work. detect_communities for
+            an SP over a whole district returns ~25 groups, all cross-jurisdiction.
+          - SYNTHETIC ARTIFACT (unchanged from P7/P8): the tiny name pool leaves some
+            over-merged clusters that span many districts (e.g. one seed spanned 18). On
+            real data these shrink. Don't tune the graph to hide it — it's an ER-precision
+            artifact P8 already quantifies.
+          - stations_in_view is intersected with the caller's scope, so a group's
+            "stations_spanned" never reveals jurisdictions the caller doesn't own.
+
+Next:     P13 (trend + hotspot tools, §3 still 🔴) is the natural next tool tier — same
+          pattern, auto-registers into /chat, and test_every_tool_has_a_question enforces
+          an eval question per tool. Or P19 (frontend, Slate) to make the 13 tools +
+          network graphs visible. P7a would extend this graph to victims (victim-offender
+          overlap) for the rest of §2.
+```
 
 ### 2026-07-19 · Claude (Thiru) · P14
 ```
