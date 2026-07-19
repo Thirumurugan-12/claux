@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P11 ✅ (Phase 1 + core of Phase 2 tools). P14 orchestration is the merge point |
+| P14 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Orchestration loop: FastAPI /chat + Claude tool-calling loop over catalog.build_registry(), injectable LLM client so the loop is testable without a live key |
 
 ---
 
