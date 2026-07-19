@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
+| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅ + UI/UX redesign ✅ + bespoke revision & FE refactor ✅ + bento-grid UI upgrade ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
 
 ---
 
@@ -145,6 +145,7 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 | 2026-07-19 | **Postgres stays EXTERNAL to Catalyst** — not migrated to Catalyst Data Store | Verified against Catalyst's own agent-skills docs: Data Store/ZCQL has no recursive CTEs (RBAC unit-subtree scope), no PostGIS (geo), no pgvector (semantic search), no pg_trgm (fuzzy match). The ER core is unimplementable on it. Everything above the DB is Catalyst. | Claude |
 | 2026-07-19 | **LLM = Catalyst QuickML LLM Serving** (Qwen 2.5, BYOK) via `OpenAICompatClient`; direct Anthropic (`claude-opus-4-8`) demoted to local-comparison fallback (`LLM_PROVIDER=anthropic`) | Catalyst is the ONLY permitted cloud, so the LLM must be Catalyst's own. QuickML LLM Serving is the concrete native offering (Qwen models, POST endpoint + Zoho OAuth). "UniAI" turned out not to be a findable Catalyst component; kept the `UNIAI_*` env-var names as the generic "Catalyst LLM endpoint" config to avoid churn. Wire format assumed OpenAI-compatible (undocumented; verify with `run_eval --live`), with `UNIAI_CHAT_PATH`/`UNIAI_AUTH_SCHEME` knobs. | Claude |
 | 2026-07-19 | **Tool calling defaults to `prompted` mode**, not native OpenAI `tools` | Whether QuickML's serving endpoint exposes OpenAI function-calling is undocumented and can't be assumed — the entire loop depends on tool selection. `prompted` injects the tool catalogue + a strict JSON protocol (`{"tool":...}` / `{"final":...}`) into the system prompt and parses the reply, so the loop runs on ANY chat model incl. a plain Qwen deployment. `UNIAI_TOOL_MODE=native` is available when the endpoint supports tools (better quality). | Claude |
+| 2026-07-19 | **Frontend gained a light mode + moved off the all-monospace look** (PLAN.md/P19 describe "dark/dense/operational", implicitly mono-first) | The redesign keeps dark as the DEFAULT and stays dense/operational, but adds a sandalwood/ivory light theme (toggle in top bar, persisted to `localStorage` under `ksp-theme`, no-flash init script in `index.html`) for daylight/projector demos and accessibility. Body/UI type is now Inter, headings Outfit, with **JetBrains Mono reserved for data/IDs/CrimeNos only** — the previous all-mono body hurt readability of prose answers. Noto Sans Kannada is in the body stack so the Kannada voice/text output renders. Palette is Karnataka-rooted (Mysore gold primary, Hampi terracotta for heat/danger, Kaveri teal for info/links). No backend, API, prop, or data-contract change. | Claude (Opus) |
 
 ---
 
@@ -864,4 +865,246 @@ Next:     P14 (orchestration ★) is now the high-leverage merge point: 9 tools 
           unanswerable questions. That makes the whole thing demoable end-to-end.
           Alternatively P12 (network tools) or P13 (trends) to widen the catalogue first.
           Recommend P14.
+```
+
+### 2026-07-19 · Claude (Opus) · UI/UX redesign (frontend only)
+```
+Did:      Complete presentation-layer redesign of frontend/ to a premium, culturally-rooted
+          GovTech aesthetic (Karnataka heritage palette, sarvam.ai-style clean typography).
+          ZERO backend/API/prop/data-contract change — same tools render, same interactions.
+          DESIGN SYSTEM (frontend/src/index.css, full rewrite):
+          - Tokens as CSS custom properties; dark (default) + light via [data-theme] on <html>.
+            Toggle in top bar, persisted to localStorage("ksp-theme"), no-flash init script in
+            index.html. Warm-tinted dark neutrals (bg #0E1015 → border-strong #3A4350);
+            sandalwood/ivory light surfaces.
+          - Palette: Mysore GOLD (#E0A21A, hover #C98A00, soft #F2C94C) = brand/primary/active;
+            Hampi TERRACOTTA (#C2643D/#B5533C) = hotspots/heat/danger; Kaveri TEAL
+            (#0F5E70/#12657F/#2E96AE) = info/links/co-offender nodes. Semantic success/warn.
+          - Typography via @fontsource (offline, bundled — NOT a CDN): Outfit (display/headings),
+            Inter (body/UI), JetBrains Mono (IDs/CrimeNos/numbers only — moved OFF all-mono),
+            Noto Sans Kannada (in body stack so Kannada voice/text output renders). Type scale
+            11–40, spacing 4px scale (--space-1..10), radii + subtle elevation tokens.
+          - Motifs: two inline-SVG data-URI patterns (Kasuti/Hoysala stepped-star lattice +
+            diagonal weave) used at ~0.05 opacity on the top bar, empty states, and card
+            headers via a .motif helper + ::before layers; a gold→terracotta→teal accent strip
+            under the top bar and case-drawer header. Tasteful, never over the data.
+          - Micro-interactions: message ease-in, tool-chip slide-in, tab underline crossfade,
+            button press states, focus-visible gold rings, hover transitions; all wrapped in a
+            prefers-reduced-motion guard. Custom scrollbars.
+          LAYOUT (App.tsx): refined top bar (gold emblem plate w/ stepped-star, brand, scope
+            PILL, premium role switcher w/ custom caret, dark/light toggle) + slim footer status
+            strip. Two-pane workspace unchanged in behaviour; tabs got icons + pulse badges +
+            crossfaded pane content + beautiful empty states (motif + glyph). Responsive stack
+            under 860px. Kept the role→remount-chat linkage and answer→repaint-panes logic.
+          COMPONENTS (restyled, props/behaviour preserved): ChatPane (bubbles, streaming cursor,
+            tool chips, icon send w/ spinner, banner w/ alert icon, suggestion pills),
+            EvidencePane (provenance cards, mono CrimeNo chips → CaseDrawer), NetworkGraph (SVG
+            gold seed w/ glow gradient + teal co-offenders, weight-scaled edges), HotspotMap (SVG
+            graticule frame + terracotta heat, coverage-honesty note kept verbatim), CaseDrawer
+            (sticky gradient header, tag rows, Esc-to-close, kv grid). Added src/icons.tsx
+            (lightweight inline SVG set — no icon dependency).
+          NEW DEPS: @fontsource/{outfit,inter,jetbrains-mono,noto-sans-kannada} only. No
+            MapLibre/Cytoscape/torch — SVG panes stayed SVG as required.
+
+Works:    `npx tsc --noEmit` clean. `npm run build` (tsc -b && vite build) clean — built in
+          ~0.7s, index.js 162.67 kB (gzip 52.77) + index.css 73.01 kB (gzip 27.58), fonts
+          bundled as woff/woff2 assets (offline). `docker compose build frontend` from repo
+          root — RAN and SUCCEEDED (image ksp-crime-intelligence-frontend:latest built; needed
+          elevated/network perms — the sandboxed `docker info` reports the daemon down, but the
+          daemon is reachable when run unsandboxed). Files changed: index.css, main.tsx (font
+          imports), index.html (theme init + meta), App.tsx, icons.tsx (new), and all five
+          components under src/components/. package.json (+4 @fontsource deps). Code NOT
+          committed (only this log + the earlier claim commit, per the task).
+
+Broken:   Nothing. Notes:
+          - Behaviour/data contracts untouched: api.ts, /api/* paths, SSE parsing,
+            extractGraph/extractGeo, component props all identical. Streaming chat, tool chips,
+            role switch, evidence CrimeNo→CaseDrawer, network/map tabs, 503 LLM banner, and
+            403 out-of-jurisdiction all still work as before.
+          - Two deviations from PLAN's "dark/dense/operational" (light mode + off all-mono) are
+            logged in "Decisions that deviate from PLAN.md". Dark stays the default and it's
+            still dense.
+          - The chat itself still needs the LLM configured (UNIAI_* or LLM_PROVIDER=anthropic);
+            unchanged — panes/evidence/role-switch/case-drawer work regardless.
+
+Next:     P20 upgrades the SVG panes to MapLibre/Cytoscape — the new palette tokens
+          (--gold/--kaveri/--heat, node/edge classes) are the intended colours to carry over.
+          A native-speaker pass on Kannada templates (P22) can now rely on the Noto Sans
+          Kannada pairing already wired into the body font stack.
+```
+
+### 2026-07-19 · Claude (Opus) · UI/UX revision + FE refactor
+```
+Did:      Second design pass — the first redesign was verdict'd "still looks AI-generated /
+          vibe-coded". Rebuilt the presentation into a bespoke operational console AND
+          refactored frontend/src for real engineering hygiene. ZERO backend/contract change:
+          /api/* paths, request/response JSON, SSE parsing, and all wire types are byte-for-
+          byte identical (api.ts was only reorganised into modules, not altered on the wire).
+
+          STACK CORRECTION (was a live confusion): the frontend is **React 18 + Vite + TS**,
+          NOT Next.js. No framework migration; none needed or wanted.
+
+          DE-AI DESIGN (what removed the "AI smell", index.css full rewrite):
+          - Killed the tells: the gold→terracotta→teal rainbow accent strips (top bar +
+            drawer), the Kasuti motif stamped onto the top bar / every card / every empty
+            state, the gradient emblem plate, the radial-gradient "glows" behind the SVG
+            panes and viz backgrounds, drop-shadows on cards/bubbles, the infinite pulse
+            badges, and the everything-is-a-pill radii. These are the generic templated
+            choices that read as vibe-coded.
+          - Replaced with an opinionated system: one dominant calm surface (cool graphite
+            near-black canvas, NOT the previous warm "sandalwood" tint), structure carried by
+            crisp 1px hairlines instead of shadows/gradients, and gold used SPARINGLY as a
+            signal only (active tab underline, focus ring, primary send button, tab data-dot,
+            seed graph node, the FIR number in the drawer). Terracotta strictly = heat/danger;
+            teal = links/interactive. Deliberate small radii (4/6/9px), a real 4px spacing
+            grid, a tightened type scale (11–24, dropped the 40px display), tabular mono for
+            all IDs/counts/metrics.
+          - Chat is now an analyst transcript, not a symmetric two-bubble messenger: user
+            queries are compact right-aligned blocks, assistant answers are full-width prose
+            with a quiet label + an inline "Traced" tool-chip row. This asymmetry is the
+            single biggest "not-a-chatbot-template" move.
+          - Heritage kept as exactly ONE restrained detail x2: the line-only Kasuti stepped-
+            diamond brand glyph, and a single thin engraved rule (one diamond) as the empty-
+            state divider. Nothing else is themed.
+          - Real states throughout: hover/active/focus-visible (gold rings), streaming cursor,
+            busy spinner in the send button, teaching empty states, error banner (role=alert),
+            disabled states; motion is subtle and under a prefers-reduced-motion guard.
+            A11y: semantic landmarks (header/main/aside/section/footer), aria-labels on all
+            icon-only buttons, Enter-to-send, Esc-closes-drawer, AA-minded contrast.
+
+          MODULAR REFACTOR (Part B — was one flat components/ dir + a monolithic api.ts):
+          New src/ tree:
+            api/         client.ts (fetch/SSE), types.ts (all wire types), extract.ts
+                         (tool→pane narrowing, the only place that knows tool payload shapes),
+                         index.ts barrel
+            hooks/       useTheme, useDemoRoles, useChatStream (owns streaming/history/patch
+                         logic that used to live inside ChatPane), usePaneData (the App memo)
+            components/  presentational primitives: icons, IconButton, Chip, Pill, Tabs,
+                         EmptyState, KeyValue, Drawer, ThemeToggle
+            features/    chat/ (ChatPane, ChatMessage, ChatComposer, ToolTrace, suggestions),
+                         evidence/ (EvidencePane, ProvenanceCard), network/ (NetworkGraph),
+                         map/ (HotspotMap), roles/ (RoleSwitcher), case/ (CaseDrawer),
+                         layout/ (TopBar, StatusBar, Workspace)
+            lib/         constants.ts (magic numbers lifted: theme key, history limit, graph/
+                         map dims + bbox, chip caps), format.ts (count/humanize/errorMessage)
+          App.tsx is now a thin composition (~50 lines) of hooks + feature components. Views
+          are declarative; side-effect/stateful logic lives in hooks. Types tightened: the old
+          `data?: any` / `e: any` are gone — ToolData = Record<string,unknown> narrowed via
+          guards in extract.ts, CaseRecord/AccusedRef typed for the drawer, errors handled as
+          unknown. No implicit any. Removed the unused `@/*` tsconfig path alias (dead config).
+
+          TOOLING ADDED (was: "lint" = just tsc): ESLint 9 flat config (@eslint/js +
+          typescript-eslint + react-hooks + react-refresh + eslint-config-prettier) and
+          Prettier, both standard/minimal. Scripts: typecheck (tsc), lint (tsc && eslint .),
+          format / format:check. Added frontend/.dockerignore (node_modules/dist/.git) — the
+          Dockerfile's `COPY . .` runs AFTER `npm install`, so without it a host node_modules
+          (now present because we install locally) would clobber the image's Linux modules.
+
+          FONTS unchanged set but trimmed to used weights only (Outfit 600 wordmark; Inter
+          400/500/600; JetBrains Mono 400/500/600; Noto Sans Kannada 400/500) — still bundled
+          via @fontsource, no CDN. No new runtime deps; SVG panes stayed SVG.
+
+Works:    All run this pass, all green:
+          - `npx tsc --noEmit` → clean.
+          - `npm run lint` (tsc --noEmit && eslint .) → clean, 0 errors/0 warnings.
+          - `npm run format:check` → all files match Prettier.
+          - `npm run build` (tsc -b && vite build) → clean; index.js 165.13 kB (gzip 53.68) +
+            index.css 59.87 kB (gzip 25.89), fonts bundled as woff/woff2. Built in ~0.4s.
+          - `docker compose build frontend` (repo root) → RAN and SUCCEEDED (needed elevated
+            perms; the sandboxed `docker info` reports the daemon down but it's reachable
+            unsandboxed, same as last pass). `npm install` in-image added 181 pkgs, 0 vulns,
+            image ksp-crime-intelligence-frontend:latest built.
+
+Broken:   Nothing. Notes:
+          - Behaviour/contracts untouched: streaming chat + inline tool chips, role switch
+            remounts chat with a new principal (RBAC demo), evidence CrimeNo chips → CaseDrawer
+            via POST /api/case incl. honest 403, network/map SVG panes from extractGraph/
+            extractGeo, ask→panes-repaint linkage, 503 LLM banner. Dark default + light toggle
+            + localStorage persistence (ksp-theme) all preserved.
+          - `make lint` runs `npm run lint`, which is now tsc + eslint (was tsc only) — a
+            strict improvement, still passes. Chat still needs the LLM configured (UNIAI_* or
+            LLM_PROVIDER=anthropic); panes/evidence/role-switch/case-drawer work regardless.
+          - Code left UNCOMMITTED per the task; only this log + the earlier claim commit went in.
+
+Next:     Unchanged: P20 upgrades the SVG panes to Cytoscape/MapLibre — the new token names
+          (--accent/--link/--heat, .graph-node/.graph-edge/.map-hotspot classes) are the
+          colours to carry over. P16→P17→P17a→P20→P25 remains the demo path.
+```
+
+### 2026-07-19 · Claude (Opus) · UI upgrade (bento grid)
+```
+Did:      Reorganised the frontend layout around a BENTO GRID and added tile primitives.
+          ZERO backend/contract change: /api/* paths, request/response JSON, SSE parsing,
+          and every wire type in src/api/ are byte-for-byte identical — presentation only.
+
+          WHY BENTO (over the two other options offered):
+          - For a data-dense operational/analytics console judged by government stakeholders,
+            a bento grid gives modern structure, clear information hierarchy, and a premium
+            dashboard feel without hurting legibility.
+          - Neumorphism was rejected: low-contrast extruded surfaces fail AA and read dated.
+          - Heavy glassmorphism/liquid-glass was rejected across data surfaces: translucency
+            over maps/graphs/evidence muddies text. Kept as ONE restrained accent only —
+            a subtle backdrop blur on the drawer scrim (with the solid --overlay-scrim as the
+            fallback), never on a data pane.
+
+          LAYOUT: the old two-column workspace (chat | tabbed panes) is now a 3-tile bento of
+          intentional, varied sizes on a recessed --canvas:
+            - tile-chat     : tall PRIMARY tile spanning both rows (left) — the conversation.
+            - tile-session  : compact context tile (top-right) — NEW. Shows the active RBAC
+                              principal + scope (moved out of the top bar to avoid duplicating
+                              the role switcher) plus live signals from the last answer:
+                              Tools run / FIRs cited / Rows examined (or a red Denied count
+                              when a tool was refused). Tabular mono numerals.
+            - tile-analysis : large tile (bottom-right) — the existing Evidence/Network/Map
+                              tabbed pane, with the tab strip now serving as the tile header.
+          Responsive: 2-col reflows to a slightly tighter split ≤1080px, then collapses to a
+          single scrolling column ≤900px (chat 62vh, analysis 72vh) — reflows, doesn't break.
+
+          NEW PRIMITIVES / COMPONENTS:
+            - components/Tile.tsx      — the reusable bento tile (header slot: `title`+`actions`
+                                         OR a custom `head` node like the tab strip; body slot
+                                         with `tile-flow`/`tile-pad` variants). Everything is
+                                         composed from this, so radii/hairlines/elevation stay
+                                         consistent.
+            - features/layout/SessionPanel.tsx — the context tile (memoised signal summary over
+                                         toolCalls; reuses the Pill primitive for the role badge).
+          WIRED: ChatPane and Workspace now render inside <Tile>; App composes the three tiles
+          under <main className="bento">; TopBar dropped its scope Pill (now in the Session tile).
+
+          TOKENS ADDED (index.css): --r-tile (10px), --bento-gap (12px), --tile-head-h (44px),
+          and per-theme --tile-shadow (restrained: a hairline does the real work, the shadow
+          only lifts the tile off the canvas) + --canvas (recessed bento background, one step
+          below --bg in both themes). Tiles are --surface on the --canvas so hairline + subtle
+          elevation read as separate designed surfaces. No rainbow strips, no glows, no
+          everything-rounded — the de-AI'd register from the last pass is preserved.
+
+          A11y: tiles are <section aria-label>; icon buttons keep aria-labels; focus-visible
+          gold rings unchanged; the glass note has a solid fallback and text never sits on blur;
+          motion additions are none beyond existing (all still under prefers-reduced-motion).
+
+Works:    All run this pass, all green:
+          - `npx tsc --noEmit` → clean.
+          - `npm run lint` (tsc --noEmit && eslint .) → clean, 0 errors / 0 warnings.
+          - `npm run format` then `npm run format:check` → all files match Prettier.
+          - `npm run build` (tsc -b && vite build) → clean; 71 modules, index.js 166.94 kB
+            (gzip 54.17) + index.css 62.32 kB (gzip 26.43), fonts bundled offline. ~0.4s.
+          - `docker compose build frontend` (repo root) → RAN and SUCCEEDED (elevated perms;
+            image ksp-crime-intelligence-frontend:latest built/unpacked). Repo root clean —
+            no stray root-level package-lock.json.
+
+Broken:   Nothing. Notes:
+          - Behaviour/contracts untouched: streaming chat + inline tool chips, role switch
+            remounts chat with a new principal (RBAC demo), evidence CrimeNo chips → CaseDrawer
+            via POST /api/case incl. honest 403, network/map SVG panes from extractGraph/
+            extractGeo, ask→panes-repaint linkage, 503 LLM banner. Dark default + light toggle
+            + localStorage persistence (ksp-theme) all preserved. Chat still needs the LLM
+            configured (UNIAI_* or LLM_PROVIDER=anthropic); the tiles/evidence/role-switch/
+            case-drawer work regardless.
+          - Scope readout moved from the top bar into the Session tile (control vs. status
+            split) — a deliberate de-duplication, not a lost feature.
+          - Code left UNCOMMITTED per the task; only this log + the earlier claim commit went in.
+
+Next:     Unchanged: P20 upgrades the SVG panes to Cytoscape/MapLibre inside the existing
+          tile-analysis tile (drop-in — the tile header/body slots stay). P16→P17→P17a→P20→P25
+          remains the demo path.
 ```
