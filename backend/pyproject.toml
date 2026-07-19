@@ -17,6 +17,8 @@ dependencies = [
     "metaphone>=0.6",
     "jellyfish>=1.1",
     "networkx>=3.3",
+    # orchestration loop (P14): the Claude tool-calling client
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -45,3 +47,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+# FastAPI's Depends()/Query()/etc. are designed to be used as argument defaults; B008
+# (function call in default) is a false positive for that idiom.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
