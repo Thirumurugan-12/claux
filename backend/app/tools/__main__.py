@@ -11,11 +11,11 @@ from __future__ import annotations
 import json
 import sys
 
-from app.tools.demo import build_default_registry
+from app.tools.catalog import build_registry
 
 
 def main() -> int:
-    registry = build_default_registry()
+    registry = build_registry()
     print(json.dumps(registry.anthropic_schemas(), indent=2))
     return 0
 
