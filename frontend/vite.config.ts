@@ -11,9 +11,11 @@ export default defineConfig({
       usePolling: true,
     },
     proxy: {
-      // Frontend calls /api/*; Compose resolves `backend` on the shared network.
+      // Frontend calls /api/*; the target is the backend. Compose resolves `backend` on the
+      // shared network; set VITE_API_TARGET to the AppSail URL for a Catalyst deploy, or to
+      // http://localhost:8000 for bare local dev.
       "/api": {
-        target: "http://backend:8000",
+        target: process.env.VITE_API_TARGET ?? "http://backend:8000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },

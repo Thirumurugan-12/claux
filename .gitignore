@@ -34,3 +34,6 @@ backend/ingest/synth/ground_truth*.json
 .DS_Store
 .idea/
 *.swp
+
+# TypeScript incremental build cache
+*.tsbuildinfo

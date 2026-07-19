@@ -63,7 +63,9 @@ make clear which tool result it came from.
 
 @dataclass
 class ToolCallRecord:
-    """One executed tool call, for the transcript and the provenance chain."""
+    """One executed tool call, for the transcript and the provenance chain. ``data`` is the
+    tool's result payload — carried so the UI (P19) can render a returned network graph or
+    hotspot set in its visual panes without re-running the tool."""
 
     tool: str
     params: dict[str, Any]
@@ -71,6 +73,7 @@ class ToolCallRecord:
     row_ids: list[int] = field(default_factory=list)
     crime_nos: list[str] = field(default_factory=list)
     error: str | None = None
+    data: Any = None
 
 
 @dataclass
@@ -221,6 +224,7 @@ class Orchestrator:
             ok=True,
             row_ids=list(prov.row_ids),
             crime_nos=list(prov.crime_nos),
+            data=result.data,
         )
         payload = json.dumps(
             {"data": result.data, "provenance": prov.model_dump()}, default=str

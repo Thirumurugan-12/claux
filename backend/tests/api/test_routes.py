@@ -97,6 +97,49 @@ def test_chat_route_relays_rbac_denial_without_data(a_case):
         app.dependency_overrides.clear()
 
 
+def test_demo_principals_lists_all_roles_with_ids():
+    client = TestClient(app)
+    resp = client.get("/demo/principals")
+    assert resp.status_code == 200
+    roles = {r["role"] for r in resp.json()["roles"]}
+    assert {"sho", "dysp", "sp", "scrb_analyst", "policymaker"} <= roles
+    by_role = {r["role"]: r for r in resp.json()["roles"]}
+    # operational roles are populated with real scope ids
+    assert by_role["sho"]["principal"]["unit_id"] is not None
+    assert by_role["sp"]["principal"]["district_id"] is not None
+    # state roles carry no unit/district
+    assert "unit_id" not in by_role["scrb_analyst"]["principal"]
+
+
+def test_case_lookup_returns_case_for_in_scope_principal(a_case):
+    client = TestClient(app)
+    resp = client.post(
+        "/case",
+        json={
+            "principal": {"name": "sp", "role": "sp", "district_id": a_case["district_id"]},
+            "crime_no": a_case["crime_no"],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["crime_no"] == a_case["crime_no"]
+
+
+def test_case_lookup_denied_out_of_scope_is_403(a_case):
+    client = TestClient(app)
+    resp = client.post(
+        "/case",
+        json={
+            "principal": {
+                "name": "sho",
+                "role": "sho",
+                "unit_id": a_case["police_station_id"] + 1,
+            },
+            "case_master_id": a_case["case_master_id"],
+        },
+    )
+    assert resp.status_code == 403
+
+
 def test_chat_stream_route_emits_events(a_case):
     app.dependency_overrides[get_llm_client] = _override_llm(
         [
