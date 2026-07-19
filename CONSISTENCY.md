@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P5 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | name parsing + normalization + phonetic key |
+| _(none active)_ | | | | P1✅ P2✅ P5✅ — P6 (blocking+scoring) is next, P9 free |
 
 ---
 
@@ -48,7 +48,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 ### Phase 1 — Entity resolution
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P5 | Name parsing + normalization ★ | 🟡 | Claude | in progress |
+| P5 | Name parsing + normalization ★ | ✅ | Claude | `er/names.py`; 95.6% blocking recall vs P2 corruption |
 | P6 | Blocking + pairwise scoring | ⬜ | | |
 | P7 | Collective resolution ★ | ⬜ | | |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
@@ -259,4 +259,35 @@ Next:     Whoever picks this up: run `make reset` first, fix whatever the DDL
           Open question that blocks P7 later: inv_arrest_surrender_accused is
           INFERRED — its real column structure is unknown and collective
           entity resolution depends on it. Chase the organisers.
+```
+
+### 2026-07-18 · Claude (Thiru) · P5
+```
+Did:      Built er/names.py (parsing + normalization + phonetic key). Parses the
+          four components (given / @-alias / patronymic+relation / honorifics),
+          handles S/o D/o W/o C/o + word forms + bin/binte, strips a leading "Late"
+          from patronymics. Normalizes via Kannada->Roman transliteration. Phonetic
+          key = Double Metaphone over a Dravidian-normalized stem (aspirate collapse,
+          th/t sh/s v/w, doubled-consonant collapse, terminal-vowel drift, kinship
+          suffix -appa/-anna/-amma/-gowda strip with a length guard).
+
+Works:    pytest tests/er/ -> 19 passed. Acceptance case parses into all four parts.
+          Headline: 95.6% given-name blocking recall measured directly against P2's
+          corruption machinery (render_variant) over 10 identities x 500 variants.
+          Distinct names stay in distinct blocks. Full suite 36 passed, ruff clean.
+
+Broken:   Nothing. Notes for whoever does P6:
+          - Added deps to pyproject: indic-transliteration, metaphone, jellyfish
+            (jellyfish is there for your Jaro-Winkler in P6 — already installed).
+          - The phonetic key is deliberately AGGRESSIVE (recall-first) because it's a
+            blocking key, not a decision. Do NOT tighten it to raise precision — that's
+            the scorer's job. Expect ~4% of true pairs to miss the first-token block;
+            catch them with the district + shared-arrest blocks (PLAN.md §2 stage 3).
+          - ParsedName exposes normalized_given (Jaro-Winkler), phonetic_key,
+            patronymic + patronymic_key, relation, honorifics. parse() is the entry point.
+
+Next:     P6 (er/blocking.py + er/scoring.py) is unblocked and is the direct next step.
+          Block on phonetic_key of first token + district + shared arrest event; score
+          with Jaro-Winkler(normalized_given) + patronymic match + alias overlap + age
+          consistency (±2y — matches P2's drift) + gender hard-gate + geography.
 ```
