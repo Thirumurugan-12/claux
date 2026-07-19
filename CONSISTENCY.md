@@ -28,8 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| UI/UX redesign | Claude (Opus) | feature/frontend-design | 2026-07-19 | Frontend design-system + layout + component refactor; no backend changes |
-| _(status)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
+| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅ + UI/UX redesign ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
 
 ---
 
@@ -146,6 +145,7 @@ the amendment log. Include *why*, so the other person doesn't undo it.
 | 2026-07-19 | **Postgres stays EXTERNAL to Catalyst** — not migrated to Catalyst Data Store | Verified against Catalyst's own agent-skills docs: Data Store/ZCQL has no recursive CTEs (RBAC unit-subtree scope), no PostGIS (geo), no pgvector (semantic search), no pg_trgm (fuzzy match). The ER core is unimplementable on it. Everything above the DB is Catalyst. | Claude |
 | 2026-07-19 | **LLM = Catalyst QuickML LLM Serving** (Qwen 2.5, BYOK) via `OpenAICompatClient`; direct Anthropic (`claude-opus-4-8`) demoted to local-comparison fallback (`LLM_PROVIDER=anthropic`) | Catalyst is the ONLY permitted cloud, so the LLM must be Catalyst's own. QuickML LLM Serving is the concrete native offering (Qwen models, POST endpoint + Zoho OAuth). "UniAI" turned out not to be a findable Catalyst component; kept the `UNIAI_*` env-var names as the generic "Catalyst LLM endpoint" config to avoid churn. Wire format assumed OpenAI-compatible (undocumented; verify with `run_eval --live`), with `UNIAI_CHAT_PATH`/`UNIAI_AUTH_SCHEME` knobs. | Claude |
 | 2026-07-19 | **Tool calling defaults to `prompted` mode**, not native OpenAI `tools` | Whether QuickML's serving endpoint exposes OpenAI function-calling is undocumented and can't be assumed — the entire loop depends on tool selection. `prompted` injects the tool catalogue + a strict JSON protocol (`{"tool":...}` / `{"final":...}`) into the system prompt and parses the reply, so the loop runs on ANY chat model incl. a plain Qwen deployment. `UNIAI_TOOL_MODE=native` is available when the endpoint supports tools (better quality). | Claude |
+| 2026-07-19 | **Frontend gained a light mode + moved off the all-monospace look** (PLAN.md/P19 describe "dark/dense/operational", implicitly mono-first) | The redesign keeps dark as the DEFAULT and stays dense/operational, but adds a sandalwood/ivory light theme (toggle in top bar, persisted to `localStorage` under `ksp-theme`, no-flash init script in `index.html`) for daylight/projector demos and accessibility. Body/UI type is now Inter, headings Outfit, with **JetBrains Mono reserved for data/IDs/CrimeNos only** — the previous all-mono body hurt readability of prose answers. Noto Sans Kannada is in the body stack so the Kannada voice/text output renders. Palette is Karnataka-rooted (Mysore gold primary, Hampi terracotta for heat/danger, Kaveri teal for info/links). No backend, API, prop, or data-contract change. | Claude (Opus) |
 
 ---
 
@@ -865,4 +865,70 @@ Next:     P14 (orchestration ★) is now the high-leverage merge point: 9 tools 
           unanswerable questions. That makes the whole thing demoable end-to-end.
           Alternatively P12 (network tools) or P13 (trends) to widen the catalogue first.
           Recommend P14.
+```
+
+### 2026-07-19 · Claude (Opus) · UI/UX redesign (frontend only)
+```
+Did:      Complete presentation-layer redesign of frontend/ to a premium, culturally-rooted
+          GovTech aesthetic (Karnataka heritage palette, sarvam.ai-style clean typography).
+          ZERO backend/API/prop/data-contract change — same tools render, same interactions.
+          DESIGN SYSTEM (frontend/src/index.css, full rewrite):
+          - Tokens as CSS custom properties; dark (default) + light via [data-theme] on <html>.
+            Toggle in top bar, persisted to localStorage("ksp-theme"), no-flash init script in
+            index.html. Warm-tinted dark neutrals (bg #0E1015 → border-strong #3A4350);
+            sandalwood/ivory light surfaces.
+          - Palette: Mysore GOLD (#E0A21A, hover #C98A00, soft #F2C94C) = brand/primary/active;
+            Hampi TERRACOTTA (#C2643D/#B5533C) = hotspots/heat/danger; Kaveri TEAL
+            (#0F5E70/#12657F/#2E96AE) = info/links/co-offender nodes. Semantic success/warn.
+          - Typography via @fontsource (offline, bundled — NOT a CDN): Outfit (display/headings),
+            Inter (body/UI), JetBrains Mono (IDs/CrimeNos/numbers only — moved OFF all-mono),
+            Noto Sans Kannada (in body stack so Kannada voice/text output renders). Type scale
+            11–40, spacing 4px scale (--space-1..10), radii + subtle elevation tokens.
+          - Motifs: two inline-SVG data-URI patterns (Kasuti/Hoysala stepped-star lattice +
+            diagonal weave) used at ~0.05 opacity on the top bar, empty states, and card
+            headers via a .motif helper + ::before layers; a gold→terracotta→teal accent strip
+            under the top bar and case-drawer header. Tasteful, never over the data.
+          - Micro-interactions: message ease-in, tool-chip slide-in, tab underline crossfade,
+            button press states, focus-visible gold rings, hover transitions; all wrapped in a
+            prefers-reduced-motion guard. Custom scrollbars.
+          LAYOUT (App.tsx): refined top bar (gold emblem plate w/ stepped-star, brand, scope
+            PILL, premium role switcher w/ custom caret, dark/light toggle) + slim footer status
+            strip. Two-pane workspace unchanged in behaviour; tabs got icons + pulse badges +
+            crossfaded pane content + beautiful empty states (motif + glyph). Responsive stack
+            under 860px. Kept the role→remount-chat linkage and answer→repaint-panes logic.
+          COMPONENTS (restyled, props/behaviour preserved): ChatPane (bubbles, streaming cursor,
+            tool chips, icon send w/ spinner, banner w/ alert icon, suggestion pills),
+            EvidencePane (provenance cards, mono CrimeNo chips → CaseDrawer), NetworkGraph (SVG
+            gold seed w/ glow gradient + teal co-offenders, weight-scaled edges), HotspotMap (SVG
+            graticule frame + terracotta heat, coverage-honesty note kept verbatim), CaseDrawer
+            (sticky gradient header, tag rows, Esc-to-close, kv grid). Added src/icons.tsx
+            (lightweight inline SVG set — no icon dependency).
+          NEW DEPS: @fontsource/{outfit,inter,jetbrains-mono,noto-sans-kannada} only. No
+            MapLibre/Cytoscape/torch — SVG panes stayed SVG as required.
+
+Works:    `npx tsc --noEmit` clean. `npm run build` (tsc -b && vite build) clean — built in
+          ~0.7s, index.js 162.67 kB (gzip 52.77) + index.css 73.01 kB (gzip 27.58), fonts
+          bundled as woff/woff2 assets (offline). `docker compose build frontend` from repo
+          root — RAN and SUCCEEDED (image ksp-crime-intelligence-frontend:latest built; needed
+          elevated/network perms — the sandboxed `docker info` reports the daemon down, but the
+          daemon is reachable when run unsandboxed). Files changed: index.css, main.tsx (font
+          imports), index.html (theme init + meta), App.tsx, icons.tsx (new), and all five
+          components under src/components/. package.json (+4 @fontsource deps). Code NOT
+          committed (only this log + the earlier claim commit, per the task).
+
+Broken:   Nothing. Notes:
+          - Behaviour/data contracts untouched: api.ts, /api/* paths, SSE parsing,
+            extractGraph/extractGeo, component props all identical. Streaming chat, tool chips,
+            role switch, evidence CrimeNo→CaseDrawer, network/map tabs, 503 LLM banner, and
+            403 out-of-jurisdiction all still work as before.
+          - Two deviations from PLAN's "dark/dense/operational" (light mode + off all-mono) are
+            logged in "Decisions that deviate from PLAN.md". Dark stays the default and it's
+            still dense.
+          - The chat itself still needs the LLM configured (UNIAI_* or LLM_PROVIDER=anthropic);
+            unchanged — panes/evidence/role-switch/case-drawer work regardless.
+
+Next:     P20 upgrades the SVG panes to MapLibre/Cytoscape — the new palette tokens
+          (--gold/--kaveri/--heat, node/edge classes) are the intended colours to carry over.
+          A native-speaker pass on Kannada templates (P22) can now rely on the Noto Sans
+          Kannada pairing already wired into the body font stack.
 ```
