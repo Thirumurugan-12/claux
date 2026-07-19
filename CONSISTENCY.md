@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P12,P14 ✅ + Catalyst pivot ✅. 13 tools live in /chat. Next: P13 (trends, §3) or P19 UI (Slate). |
+| P13 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Trend + hotspot tools (app/tools/trends.py): crime_trend, hotspot_scan (DBSCAN + precise/centroid honesty), spatiotemporal_clusters, compare_to_baseline (z-score red-zone), seasonality, zero_fir_flows (CrimeNo category digit). |
 
 ---
 
