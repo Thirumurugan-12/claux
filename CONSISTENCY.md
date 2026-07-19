@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P15 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | MO fingerprinting (ml/mo/): TF-IDF→SVD→HDBSCAN over brief_facts, pgvector storage, get_mo_cluster + find_similar_cases (with cstype outcomes). Lexical (no torch) — env-constrained; measured vs mo_by_case GT. |
+| _(none active)_ | | | | P1,P2,P5–P15,P19 ✅ + Catalyst pivot ✅. 21 tools + chat UI. Next (demo path): P16→P17→P17a→P20→P25. |
 
 ---
 
@@ -47,7 +47,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | §2 | Network / link analysis | 🟢 built | **P12 ✅** — person_network / shortest_path / communities (Louvain, cross-jurisdiction flag) / repeat_offenders over the resolved-person graph. P7a victim overlap ⬜ (extends to victims). |
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🟢 built | **P13 ✅** — crime_trend, hotspot_scan (DBSCAN + precise/centroid honesty), spatiotemporal_clusters, compare_to_baseline (red-zone z-score), seasonality, zero_fir_flows. P13a (event calendar + anomaly) ⬜. |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
-| §5 | Offender profiling (MO, risk) | 🔴 not started | P15 MO, P16 undetected-risk, P17 offender-risk — ER foundation ready to build on |
+| §5 | Offender profiling (MO, risk) | 🟡 MO built | **P15 ✅** — MO fingerprinting (109 clusters, homogeneity 1.000 / V-measure 0.681 vs hidden GT), get_mo_cluster + find_similar_cases w/ outcomes. P16 undetected-risk, P17 offender-risk ⬜. |
 | §6 | Investigator support (summaries, similar cases, leads) | 🟡 partial | P10✅ (get_case/person/timeline/chargesheet). P10a case-summary, P15 similar-cases, P17 leads ⬜ |
 | §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
 | §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
@@ -99,7 +99,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 ### Phase 3 — Intelligence
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P15 | MO fingerprinting ★ | ⬜ | | |
+| P15 | MO fingerprinting ★ | ✅ | Claude | `ml/mo/` + `app/tools/mo.py`; TF-IDF→SVD→HDBSCAN, pgvector, V-measure 0.681 (homogeneity 1.0) |
 | P16 | Undetected-case risk model | ⬜ | | |
 | P17 | Offender risk + leads | ⬜ | | |
 | P17a | Proactive alert engine ★ | ⬜ | | closes PS1 §8 — **above P18** |
@@ -207,6 +207,46 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-19 · Claude (Thiru) · P15
+```
+Did:      Built MO fingerprinting (ml/mo/) — the modus-operandi layer the schema lacks.
+          Pipeline: brief_facts (Kannada-script romanised via indic-transliteration) →
+          TF-IDF → TruncatedSVD 128-d (L2-normalised, stored in pgvector) → HDBSCAN on a
+          24-d top-variance view (fast; 128-d neighbour search was the bottleneck) →
+          deterministic top-terms label (LLM labeller pluggable). Persists derived.
+          mo_cluster + derived.case_mo_assignment (vector(128), hnsw cosine index; added
+          to 02_derived.sql + applied live). Tools app/tools/mo.py: get_mo_cluster,
+          find_similar_cases (cosine kNN via <=>, each result WITH cstype outcome +
+          "N similar, k chargesheeted" summary). CLI: python -m ml.mo.
+
+Works:    Full 50k: 109 clusters, 4.9% noise, V-measure 0.681 (homogeneity 1.000 /
+          completeness 0.517) vs the hidden mo_by_case ground truth. Clusters are
+          eyeball-real: OTP/vishing fraud, chain-snatching (English + a separate
+          romanised-Kannada cluster), house burglary, dowry harassment. pytest
+          tests/tools/test_mo.py -> passed (pipeline on a 3k subsample + both tools).
+          Registered (21 tools). run_eval 40/40. Full suite 158 passed, ruff clean.
+
+Broken:   Nothing. Notes:
+          - HAD to regenerate ground_truth.json: the on-disk GT predated mo_by_case (0
+            entries). Fixed with `python -m ingest.synth --cases 50000 --seed 42 --no-load`
+            — regenerates GT deterministically WITHOUT touching the DB/person_cluster.
+          - LEXICAL, not neural: a multilingual sentence-transformer (the prompt's first
+            choice) needs torch (~GB) the env can't take. TF-IDF works because the
+            generator keeps signature slot words as literal Roman tokens across en+translit
+            (~75%); homogeneity is 1.000 so clusters are pure, but completeness 0.517
+            because the SAME MO in English vs romanised-Kannada lands in separate clusters.
+            P4 (BriefFacts_en translation) would lift completeness by unifying the scripts.
+          - LLM cluster labelling (claude-sonnet-5, per prompt) is pluggable via
+            fit_clusters(labeller=...); default is deterministic top-terms so it runs
+            offline. Wire the labeller once the Catalyst LLM key exists.
+          - Clustering is an OFFLINE job (~30s at 50k); not a request path. Re-run
+            `python -m ml.mo` after any data reload.
+
+Next:     P16 (undetected-case risk) — cstype C is the label, MO cluster + the compliance/
+          timeline features are predictors. Then P17 (offender risk + leads) uses MO +
+          ER + P16. sklearn ready.
+```
 
 ### 2026-07-19 · Claude (Thiru) · P19 (+ small backend support)
 ```
