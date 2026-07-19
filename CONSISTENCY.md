@@ -32,6 +32,35 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 ---
 
+## PS1 feature coverage (audited 2026-07-18)
+
+Mapping the 10 problem-statement sections to what is actually built and running.
+**Verified this pass:** full test suite 57 passing, ruff clean, all modules import,
+FastAPI boots, DB reachable (29 ksp / 4 derived), and the P2→P5→P6→P7 pipeline runs
+end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 members).
+
+| PS1 § | Feature | Status | Where / what's left |
+|---|---|---|---|
+| — | **Foundation** (DB, synthetic data) | 🟢 built | P1✅ P2✅. P3 ingest/quality-report ⬜, P4 translation ⬜ |
+| — | **Entity resolution core** (`person_cluster`) | 🟢 built | P5✅ P6✅ P7✅. **The hard/novel part is done.** P8 F1 metric ⬜ |
+| §1 | Conversational AI interface | 🔴 not started | needs P9 tools + P14 orchestration + P19 UI |
+| §2 | Network / link analysis | 🟡 foundation only | co-offending graph + clusters exist (P7); P7a victim overlap ⬜, P12 network tools ⬜ |
+| §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
+| §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
+| §5 | Offender profiling (MO, risk) | 🔴 not started | P15 MO, P16 undetected-risk, P17 offender-risk — ER foundation ready to build on |
+| §6 | Investigator support (summaries, similar cases, leads) | 🔴 not started | P10a, P15, P17 |
+| §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
+| §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
+| §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain (P9) + reasoning viz (P19b) ⬜ |
+| §10 | RBAC & audit | 🔴 not started | P9 tool framework (RBAC at tool boundary), P9a governance |
+
+**Bottom line:** the data + entity-resolution spine — the thing every §2/§5/§6/§8
+feature is uncomputable without — is complete and measured. No end-user-facing PS1
+feature is fully delivered yet because the tool layer (P9), orchestration (P14), and
+UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is current.
+
+---
+
 ## Prompt Status
 
 `⬜ not started` · `🟡 in progress` · `✅ done` · `⚠️ done but needs revisit` · `⏭️ skipped`
