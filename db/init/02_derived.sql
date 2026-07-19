@@ -117,3 +117,31 @@ COMMENT ON TABLE case_translation IS
   'source stays untouched. All downstream analysis and debugging reads brief_facts_en — '
   'the team does not read Kannada. Filled by ingest/translate.py (P4).';
 CREATE INDEX idx_translation_lang ON case_translation(detected_lang);
+
+-- -----------------------------------------------------------------------------
+-- Audit log (P9). Every tool call is logged here — allowed or denied. The tool-call
+-- trace IS the audit trail, so this table satisfies both §9 (explainability) and §10
+-- (accountability): who asked what, with which parameters, in what scope, and whether
+-- the tool boundary let it through.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE audit_log (
+    audit_id         BIGSERIAL PRIMARY KEY,
+    ts               TIMESTAMP NOT NULL DEFAULT NOW(),
+    principal_name   VARCHAR(120),
+    principal_role   VARCHAR(40) NOT NULL,
+    principal_unit   INTEGER,
+    principal_district INTEGER,
+    tool             VARCHAR(80) NOT NULL,
+    params           JSONB,
+    row_count        INTEGER NOT NULL DEFAULT 0,
+    denied           BOOLEAN NOT NULL DEFAULT FALSE,
+    denial_reason    VARCHAR(300)
+);
+COMMENT ON TABLE audit_log IS
+  'One row per tool invocation (P9). principal_role/unit/district capture who called; '
+  'params is the validated tool input; denied + denial_reason record RBAC rejections. '
+  'This is the evidence trail — never truncate it in production.';
+CREATE INDEX idx_audit_ts ON audit_log(ts);
+CREATE INDEX idx_audit_tool ON audit_log(tool);
+CREATE INDEX idx_audit_denied ON audit_log(denied) WHERE denied;

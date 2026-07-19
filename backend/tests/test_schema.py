@@ -23,6 +23,7 @@ KSP_TABLES = {
 
 DERIVED_TABLES = {
     "person_cluster", "person_cluster_member", "er_review_queue", "case_translation",
+    "audit_log",
 }
 
 
