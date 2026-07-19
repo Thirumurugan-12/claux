@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1✅ P2✅ P5✅ — P6 (blocking+scoring) is next, P9 free |
+| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ — P7 (collective resolution) is next, P9 free |
 
 ---
 
@@ -49,7 +49,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
 | P5 | Name parsing + normalization ★ | ✅ | Claude | `er/names.py`; 95.6% blocking recall vs P2 corruption |
-| P6 | Blocking + pairwise scoring | ⬜ | | |
+| P6 | Blocking + pairwise scoring | ✅ | Claude | `er/blocking.py`+`er/scoring.py`; 55k accused→4.58M pairs in ~30s |
 | P7 | Collective resolution ★ | ⬜ | | |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
 | P8 | ER evaluation harness | ⬜ | | **the F1 number for the slide** |
@@ -290,4 +290,47 @@ Next:     P6 (er/blocking.py + er/scoring.py) is unblocked and is the direct nex
           Block on phonetic_key of first token + district + shared arrest event; score
           with Jaro-Winkler(normalized_given) + patronymic match + alias overlap + age
           consistency (±2y — matches P2's drift) + gender hard-gate + geography.
+```
+
+### 2026-07-18 · Claude (Thiru) · P6
+```
+Did:      Built er/records.py (loads accused/victim/complainant from ksp only, parses
+          names via P5, estimates birth year, derives district adjacency from case
+          centroids), er/blocking.py (candidate pairs from 3 conjunctive keys:
+          name+gender+age±2, name+gender+district, name+gender+patronymic; gender
+          folded in since it's a hard gate; same-FIR pairs excluded; oversized buckets
+          sub-block by name prefix), er/scoring.py (0-1 score + full per-signal
+          breakdown, configurable ScoringWeights, gender hard-gate, fast float path for
+          the millions of pairs + breakdown only for kept pairs). CLI:
+          `python -m er.score_pairs --top N`.
+
+Works:    Accused set: 55,716 records -> 4.58M candidate pairs, full pipeline ~30s
+          (well under the 2-min bar). Top pairs are correct same-person matches with
+          readable signal breakdowns (e.g. 'Raju @ Raj S/o Boraiah' <-> 'Raju S/o
+          Boraiahu'). Bands: >=0.85 auto-merge, 0.60-0.85 review, else reject.
+          pytest tests/er/ -> 31 passed (12 new). Full suite 48, ruff clean.
+
+Broken:   Nothing broken, but TWO things P7/P8 must know:
+          1. SYNTHETIC ARTIFACT: with only 68 given names, the 0.60 review floor keeps
+             ~561k accused pairs (9.9k auto-merge, 551k review). That's name+age+geo
+             coincidences, NOT a scorer bug — real data with 1000s of names won't do
+             this. P7's collective boost + clustering must collapse the review set;
+             don't "fix" it by inflating weights. P8 will show precision here.
+          2. CLI defaults to --roles accused (the ~50k the acceptance means). All three
+             roles = 143k records and blows past 2 min on this name pool. P7a needs
+             victim/complainant in the same namespace — enable with --roles then, and
+             expect to tune REVIEW_FLOOR or lean on clustering.
+
+          Calibration note: bare name+age+district (no patronymic/alias) intentionally
+          scores <0.60 (reject) — it's coincidence-prone. Review band is driven by
+          name+patronymic agreement with missing/weak corroboration. age decay is
+          0.8/0.6 at ±1/±2y so a genuine 1-year drift still auto-merges.
+
+Next:     P7 (er/resolve.py) — the ★ novel step. Build the co-offending graph from
+          arrest_events (already on PartyRecord for accused), run pairwise, propagate
+          scores through shared resolved co-offenders, iterate, then cluster (>=0.85
+          auto, 0.60-0.85 -> er_review_queue) and persist person_cluster +
+          person_cluster_member + match_evidence. score_pair() returns the evidence
+          dict you persist. P8 then measures F1 vs P2's ground truth (with/without the
+          collective boost = the headline delta).
 ```
