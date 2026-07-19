@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ P7✅ P8✅ — Phase 1 ER DONE. P7a or P9 next |
+| P9 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | tool framework (RBAC + provenance + audit + k-anon) |
 
 ---
 
@@ -86,7 +86,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 ### Phase 2 — Tool layer and chat
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P9 | Tool framework ★ | ⬜ | | |
+| P9 | Tool framework ★ | 🟡 | Claude | in progress |
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
 | P10 | Retrieval tools | ⬜ | | |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
