@@ -17,6 +17,8 @@ dependencies = [
     "metaphone>=0.6",
     "jellyfish>=1.1",
     "networkx>=3.3",
+    # trends/hotspots (P13) + ML layer (P15/16/18): DBSCAN, clustering, models
+    "scikit-learn>=1.5",
     # orchestration loop (P14): the direct-Anthropic client path
     "anthropic>=0.40",
     # Catalyst UniAI / OpenAI-compatible gateway client (the demo-default LLM path)

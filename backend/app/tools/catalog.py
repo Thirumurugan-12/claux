@@ -23,6 +23,14 @@ from app.tools.retrieval import (
     SearchCasesTool,
     SearchPersonsTool,
 )
+from app.tools.trends import (
+    CompareToBaselineTool,
+    CrimeTrendTool,
+    HotspotScanTool,
+    SeasonalityTool,
+    SpatioTemporalClustersTool,
+    ZeroFirFlowsTool,
+)
 
 
 def build_registry() -> ToolRegistry:
@@ -42,6 +50,13 @@ def build_registry() -> ToolRegistry:
     registry.register(FindShortestPathTool())
     registry.register(DetectCommunitiesTool())
     registry.register(GetRepeatOffendersTool())
+    # P13 trend + hotspot tools
+    registry.register(CrimeTrendTool())
+    registry.register(HotspotScanTool())
+    registry.register(SpatioTemporalClustersTool())
+    registry.register(CompareToBaselineTool())
+    registry.register(SeasonalityTool())
+    registry.register(ZeroFirFlowsTool())
     # a general aggregate demo tool (kept until a richer trends catalogue lands in P13)
     registry.register(CaseCountByDistrictTool())
     return registry
