@@ -76,15 +76,12 @@ def test_unionfind_birth_span_accumulates():
 
 
 def _collective_scenario():
-    # Two 'Ramesh' records that score ~0.80 (review, below auto-merge) on name alone,
-    # each co-arrested with a 'Suresh'. The two Sureshes auto-merge, so the Rameshes
-    # share a resolved co-offender and should be boosted over the line.
-    r0 = rec(
-        0, "Ramesh S/o Krishnappa", age=40, district=1, station=10, case=1, events=frozenset({100})
-    )
-    r1 = rec(
-        1, "Ramesh S/o Krishnappa", age=40, district=9, station=90, case=2, events=frozenset({200})
-    )
+    # Two 'Ramesh @ Rami' records with NO patronymic and in different districts: on
+    # name+alias+age alone they score ~0.75 (review, below auto-merge). Each is
+    # co-arrested with a 'Suresh'; the two Sureshes auto-merge on their own, so the
+    # Rameshes share a resolved co-offender and should be boosted over the line.
+    r0 = rec(0, "Ramesh @ Rami", age=40, district=1, station=10, case=1, events=frozenset({100}))
+    r1 = rec(1, "Ramesh @ Rami", age=40, district=9, station=90, case=2, events=frozenset({200}))
     s0 = rec(
         2, "Suresh S/o Nanjappa", age=50, district=1, station=10, case=1, events=frozenset({100})
     )

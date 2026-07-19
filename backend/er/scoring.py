@@ -31,12 +31,17 @@ from er.records import PartyRecord
 
 @dataclass
 class ScoringWeights:
-    name_jw: float = 0.35
-    patronymic: float = 0.30
-    alias: float = 0.20
-    age: float = 0.15
-    geo_same_station: float = 0.10
-    geo_same_district: float = 0.06
+    # Calibrated so the CORE identity signals — same (corrupted) given name + same
+    # father + consistent age — clear the 0.85 auto-merge line on their OWN, with no
+    # geography. That is the flagship case: the same person across different police
+    # stations. Geography and alias are bonuses, not requirements. Bare name+age with
+    # no patronymic still stays below the 0.60 review floor (coincidence-prone).
+    name_jw: float = 0.40
+    patronymic: float = 0.35
+    alias: float = 0.15
+    age: float = 0.20
+    geo_same_station: float = 0.08
+    geo_same_district: float = 0.05
     geo_adjacent: float = 0.03
     # a name below this similarity contributes nothing (kills coincidental blocks)
     jw_floor: float = 0.80
@@ -51,7 +56,7 @@ class ScoringWeights:
     # what stops a common given name (all the "Anand"s) transitively over-merging.
     # Corrupted-but-same patronymics (Maranna/Marappa) sit well above this threshold.
     patronymic_mismatch_floor: float = 0.80
-    patronymic_mismatch_penalty: float = 0.30
+    patronymic_mismatch_penalty: float = 0.35
 
 
 DEFAULT_WEIGHTS = ScoringWeights()

@@ -156,18 +156,50 @@ class ResolveResult:
 # -----------------------------------------------------------------------------
 
 
+@dataclass
+class Prepared:
+    """The one-time, config-independent work (graph + scored working set) so a caller
+    can cluster the same pairs under several configs — P8 runs propagation off vs on
+    without paying the score pass twice."""
+
+    records: list[PartyRecord]
+    working: list[WorkingPair]
+    co: dict[int, frozenset[int]]
+    patro_labels: list
+    births: list
+    n_candidate_pairs: int
+    adjacency: dict[int, set[int]] | None
+
+
+def prepare(records: list[PartyRecord], cfg: ResolveConfig,
+            adjacency: dict[int, set[int]] | None = None) -> Prepared:
+    graph = build_cooffending_graph(records)
+    co = cooffender_map(graph)
+    working, n = _score_working_set(records, cfg, adjacency)
+    return Prepared(records, working, co, [r.patronymic_key for r in records],
+                    [r.est_birth_year for r in records], n, adjacency)
+
+
 def resolve(
     records: list[PartyRecord],
     cfg: ResolveConfig | None = None,
     adjacency: dict[int, set[int]] | None = None,
 ) -> ResolveResult:
     cfg = cfg or ResolveConfig()
-    graph = build_cooffending_graph(records)
-    co = cooffender_map(graph)
+    return resolve_prepared(prepare(records, cfg, adjacency), cfg)
 
-    working, n_candidate_pairs = _score_working_set(records, cfg, adjacency)
-    patro_labels = [r.patronymic_key for r in records]
-    births = [r.est_birth_year for r in records]
+
+def resolve_prepared(prep: Prepared, cfg: ResolveConfig,
+                     attach_review_signals: bool = True) -> ResolveResult:
+    """Cluster a prepared working set under ``cfg`` (boosts are reset so a Prepared
+    can be reused across configs). ``attach_review_signals`` computes the per-signal
+    breakdown for the review band; the evaluation harness turns it off since it only
+    needs the clustering, not the human-facing evidence."""
+    records, working, co = prep.records, prep.working, prep.co
+    patro_labels, births, adjacency = prep.patro_labels, prep.births, prep.adjacency
+    for wp in working:  # reset any boost left from a previous config
+        wp.boost = 0.0
+        wp.shared_cooffenders = []
 
     base_auto = 0
     uf = _cluster(records, working, patro_labels, births)
@@ -189,12 +221,13 @@ def resolve(
         for wp in working
         if REVIEW_FLOOR <= wp.score < AUTO_MERGE and uf.find(wp.a) != uf.find(wp.b)
     ]
-    for wp in review:  # attach the breakdown only for the pairs a human will see
-        wp.signals = score_detail(records[wp.a], records[wp.b], cfg.weights, adjacency)[1]
+    if attach_review_signals:  # the breakdown a human will see; skipped in eval
+        for wp in review:
+            wp.signals = score_detail(records[wp.a], records[wp.b], cfg.weights, adjacency)[1]
 
     stats = {
         "records": len(records),
-        "candidate_pairs": n_candidate_pairs,
+        "candidate_pairs": prep.n_candidate_pairs,
         "working_pairs": len(working),
         "clusters": len(clusters),
         "multi_member_clusters": sum(1 for m in clusters.values() if len(m) > 1),
