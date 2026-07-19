@@ -16,7 +16,7 @@ logging.basicConfig(level=settings.log_level)
 
 app = FastAPI(
     title="KSP Crime Intelligence Platform",
-    description="Conversational AI and crime analytics over the Karnataka State Police FIR database",
+    description="Conversational AI and crime analytics over the Karnataka State Police FIR data",
     version="0.1.0",
 )
 

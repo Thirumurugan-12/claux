@@ -154,38 +154,41 @@ def score_value(
     if _gender_mismatch(a, b):
         return 0.0
 
+    # Rounds each contribution to 4 dp exactly as score_detail/score_pair do, so the
+    # score a pair is clustered by never disagrees with the signal sum shown as its
+    # evidence — the two must not diverge at the 0.85 auto-merge boundary.
     total = 0.0
     name_sim = _jw(a.normalized_given, b.normalized_given)
     if name_sim >= weights.jw_floor:
-        total += weights.name_jw * name_sim
+        total += round(weights.name_jw * name_sim, 4)
 
     if a.normalized_patronymic and b.normalized_patronymic:
         patro_sim = _jw(a.normalized_patronymic, b.normalized_patronymic)
         if patro_sim >= weights.patronymic_floor:
-            total += weights.patronymic * patro_sim
+            total += round(weights.patronymic * patro_sim, 4)
         elif patro_sim < weights.patronymic_mismatch_floor:
-            total -= weights.patronymic_mismatch_penalty
+            total -= round(weights.patronymic_mismatch_penalty, 4)
 
     if a.alias_norm or b.alias_norm:
         alias_sim = _best_alias_overlap(a, b)
         if alias_sim >= weights.alias_floor:
-            total += weights.alias * alias_sim
+            total += round(weights.alias * alias_sim, 4)
 
     if a.est_birth_year is not None and b.est_birth_year is not None:
         diff = abs(a.est_birth_year - b.est_birth_year)
         if diff <= weights.age_tolerance:
-            total += weights.age * max(0.0, 1 - weights.age_decay * diff)
+            total += round(weights.age * max(0.0, 1 - weights.age_decay * diff), 4)
 
     if a.station_id is not None and a.station_id == b.station_id:
-        total += weights.geo_same_station
+        total += round(weights.geo_same_station, 4)
     elif a.district_id is not None and a.district_id == b.district_id:
-        total += weights.geo_same_district
+        total += round(weights.geo_same_district, 4)
     elif (
         adjacency
         and a.district_id is not None
         and b.district_id in adjacency.get(a.district_id, ())
     ):
-        total += weights.geo_adjacent
+        total += round(weights.geo_adjacent, 4)
 
     return max(0.0, min(1.0, total))
 
