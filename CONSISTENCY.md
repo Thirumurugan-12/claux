@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P11,P14 ✅ + Catalyst pivot ✅. LLM defaults to Catalyst UniAI (BYOK); hosting mapped in DEPLOYMENT-CATALYST.md. Next: P12/P13 tools or P19 UI (deployable to Slate). |
+| P12 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Network tools (app/tools/network.py): person-level co-offending graph over person_cluster + inv_arrest_surrender_accused. get_person_network / find_shortest_path / detect_communities (Louvain, cross-jurisdiction flag) / get_repeat_offenders. Cytoscape-ready, cached graph. |
 
 ---
 
