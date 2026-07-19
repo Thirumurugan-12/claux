@@ -57,10 +57,10 @@ def _names(result: ChatResult) -> str:
 
 def client_for(case: EvalCase, live: bool) -> LLMClient:
     if live:
-        from app.api.llm import AnthropicClient
+        from app.api.llm import client_from_settings
 
-        s = get_settings()
-        return AnthropicClient(model=s.orchestration_model, api_key=s.anthropic_api_key or None)
+        # provider-selected: Catalyst UniAI (default) or direct Anthropic
+        return client_from_settings(get_settings())
     return ScriptedClient(case.turns)
 
 
@@ -111,10 +111,9 @@ def _print_multi_turn(session, registry, fx, live) -> None:
     print("=" * 72)
     steps = multi_turn_demo(fx)
     if live:
-        from app.api.llm import AnthropicClient
+        from app.api.llm import client_from_settings
 
-        s = get_settings()
-        llm = AnthropicClient(model=s.orchestration_model, api_key=s.anthropic_api_key or None)
+        llm = client_from_settings(get_settings())
         orch = Orchestrator(registry, llm)
         history = None
         for principal, msg, _turns in steps:

@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.llm import AnthropicClient, LLMClient, Message
+from app.api.llm import LLMClient, Message, client_from_settings
 from app.api.orchestrator import Orchestrator
 from app.config import get_settings
 from app.db import get_session
@@ -39,18 +39,18 @@ def get_registry():
 
 
 def get_llm_client() -> LLMClient:
-    """The live LLM client. Overridable in tests via FastAPI dependency_overrides so the
-    route can be exercised with a ScriptedClient and no network."""
-    settings = get_settings()
-    key = settings.anthropic_api_key or None
+    """The live LLM client, selected by LLM_PROVIDER — Catalyst UniAI (default, BYOK from
+    the Catalyst console) or direct Anthropic. Overridable in tests via FastAPI
+    dependency_overrides so the route can be exercised with a ScriptedClient and no network."""
     try:
-        return AnthropicClient(model=settings.orchestration_model, api_key=key)
-    except Exception as exc:  # SDK missing, or no ambient credential
+        return client_from_settings(get_settings())
+    except Exception as exc:  # unconfigured provider, missing SDK, etc.
         raise HTTPException(
             status_code=503,
             detail=(
-                "LLM client unavailable — set ANTHROPIC_API_KEY (or configure an ambient "
-                f"credential) and install the anthropic SDK. ({exc})"
+                "LLM client unavailable — for Catalyst UniAI set UNIAI_BASE_URL, "
+                "UNIAI_API_KEY and UNIAI_MODEL (or set LLM_PROVIDER=anthropic with "
+                f"ANTHROPIC_API_KEY). ({exc})"
             ),
         ) from exc
 

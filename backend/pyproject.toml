@@ -17,8 +17,10 @@ dependencies = [
     "metaphone>=0.6",
     "jellyfish>=1.1",
     "networkx>=3.3",
-    # orchestration loop (P14): the Claude tool-calling client
+    # orchestration loop (P14): the direct-Anthropic client path
     "anthropic>=0.40",
+    # Catalyst UniAI / OpenAI-compatible gateway client (the demo-default LLM path)
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
