@@ -20,12 +20,17 @@ class Settings(BaseSettings):
     # "anthropic": direct Anthropic SDK (claude-opus-4-8).
     llm_provider: str = "uniai"
 
-    # Catalyst UniAI / OpenAI-compatible gateway (BYOK from the Catalyst console)
+    # Catalyst-hosted LLM (QuickML LLM Serving) or any OpenAI-compatible endpoint.
+    # BYOK from the Catalyst console.
     uniai_base_url: str = ""
     uniai_api_key: str = ""
     uniai_model: str = ""
     uniai_chat_path: str = "/v1/chat/completions"
-    uniai_auth_scheme: str = "bearer"  # or "zoho-oauthtoken"
+    uniai_auth_scheme: str = "bearer"  # or "zoho-oauthtoken" (Zoho OAuth, e.g. QuickML)
+    # "prompted" (default): drive tool selection via a JSON protocol in the prompt — works
+    # with any chat model, incl. a plain Qwen deployment with no native tool-calling API.
+    # "native": send OpenAI `tools` and read `tool_calls` — only if the endpoint supports it.
+    uniai_tool_mode: str = "prompted"
 
     # Direct Anthropic path
     anthropic_api_key: str = ""

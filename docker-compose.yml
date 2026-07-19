@@ -40,6 +40,7 @@ services:
       UNIAI_MODEL: ${UNIAI_MODEL:-}
       UNIAI_CHAT_PATH: ${UNIAI_CHAT_PATH:-/v1/chat/completions}
       UNIAI_AUTH_SCHEME: ${UNIAI_AUTH_SCHEME:-bearer}
+      UNIAI_TOOL_MODE: ${UNIAI_TOOL_MODE:-prompted}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ORCHESTRATION_MODEL: ${ORCHESTRATION_MODEL:-claude-opus-4-8}
       BULK_MODEL: ${BULK_MODEL:-claude-sonnet-5}

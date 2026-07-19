@@ -10,7 +10,7 @@ that deliberately stays off-Catalyst (and why).
 | Component | Runs on | Notes |
 |---|---|---|
 | FastAPI backend (`backend/`) | **Catalyst AppSail** | Managed `python_3_12` runtime, or the existing Dockerfile as a custom OCI runtime (linux/amd64). Entry: `python serve.py` — binds `X_ZOHO_CATALYST_LISTEN_PORT` (mandatory; instance is killed if not bound in 10 s). |
-| LLM access | **Catalyst UniAI** (BYOK) | The orchestration loop's default provider. Configure the gateway endpoint + the key issued in the Catalyst console; no provider SDK needed. See "LLM via Catalyst UniAI" below. |
+| LLM access | **Catalyst QuickML LLM Serving** (BYOK) | The orchestration loop's default provider — Catalyst's own hosted LLMs (Qwen 2.5). Configure the model's endpoint + the key from the Catalyst console; no provider SDK needed. See "LLM on Catalyst" below. |
 | React frontend (`frontend/`, P19) | **Catalyst Slate** | Static SPA hosting; deploy via `catalyst deploy` or Git. Add the Slate origin to the backend's `CORS_ORIGINS`. |
 | Scheduled alerts (P17a) | **Catalyst Job Scheduling** | Cron-style jobs targeting the AppSail service's alert endpoint — replaces a host-side cron. |
 | PDF export (P24) | **Catalyst SmartBrowz** | Server-side PDF/screenshot generation — first choice before falling back to WeasyPrint in-process. |
@@ -30,42 +30,51 @@ likewise Postgres-native. So the database runs as external Postgres (docker comp
 demo; any managed Postgres for a longer-lived deployment) and AppSail connects to it over
 `POSTGRES_HOST`/`POSTGRES_PORT`. Everything above the database is Catalyst.
 
-## LLM via Catalyst UniAI
+## LLM on Catalyst
 
-The backend's LLM boundary (`app/api/llm.py`) is provider-agnostic. `LLM_PROVIDER=uniai`
-(the default) uses `OpenAICompatClient`, which speaks the OpenAI chat-completions wire
-format — including function/tool calling, which the orchestration loop requires — against
-any compatible gateway endpoint:
+Catalyst is the only cloud, so the LLM is Catalyst's own: **QuickML LLM Serving** (Qwen 2.5
+— 14B Instruct, 7B Coder, 7B Vision), served from a per-model POST endpoint with Zoho OAuth.
+Deploy/select a model in QuickML, then read its endpoint + key from the model's **API
+Details** panel and configure:
 
 ```
 LLM_PROVIDER=uniai
-UNIAI_BASE_URL=<gateway base URL from the Catalyst console>
-UNIAI_API_KEY=<key issued in the Catalyst console>
-UNIAI_MODEL=<model id as named by the gateway>
-UNIAI_CHAT_PATH=/v1/chat/completions        # override if the gateway differs
-UNIAI_AUTH_SCHEME=bearer                    # or zoho-oauthtoken
+UNIAI_BASE_URL=<endpoint URL from the model's API Details>
+UNIAI_API_KEY=<OAuth access token / key from the Catalyst console>
+UNIAI_MODEL=<model id, e.g. qwen2.5-14b-instruct>
+UNIAI_CHAT_PATH=/v1/chat/completions   # set to "" if the endpoint URL is already complete
+UNIAI_AUTH_SCHEME=zoho-oauthtoken       # QuickML uses Zoho OAuth; "bearer" for plain gateways
+UNIAI_TOOL_MODE=prompted                # see below
 ```
 
-**Day-one verification (do this the moment the hackathon key is issued):** UniAI's exact
-wire format is not publicly documented, so the client assumes the OpenAI-compatible shape
-that unified gateways (and Catalyst QuickML LLM serving) expose. Verify with:
+### Tool calling: `prompted` (default) vs `native`
+
+The platform depends on the model **selecting typed tools** (the LLM never writes SQL, never
+authors a fact). Whether Catalyst's serving endpoint exposes OpenAI-style function calling is
+undocumented, so the client supports two modes and **defaults to the one that always works**:
+
+- **`prompted`** (default) — the tool catalogue and a strict JSON protocol are injected into
+  the system prompt; the model replies with `{"tool": ...}` or `{"final": ...}`, which the
+  client parses. Works with **any** chat model, including a plain Qwen deployment with no
+  tool-calling API. This is the safe Catalyst default.
+- **`native`** — sends OpenAI `tools` and reads `tool_calls`. Better quality; set
+  `UNIAI_TOOL_MODE=native` only after confirming the endpoint supports it.
+
+### Day-one verification (the moment the model + key exist)
 
 ```
-export UNIAI_BASE_URL=... UNIAI_API_KEY=... UNIAI_MODEL=...
+export UNIAI_BASE_URL=... UNIAI_API_KEY=... UNIAI_MODEL=... UNIAI_AUTH_SCHEME=zoho-oauthtoken
 cd backend && python -m app.api.run_eval --live
 ```
 
 That runs the full 28-question eval (tool routing, RBAC denials, refusal cases) against the
-gateway and prints a pass rate. If the endpoint/auth differs, `UNIAI_CHAT_PATH` and
-`UNIAI_AUTH_SCHEME` are the knobs; if the format differs materially, only
+live Catalyst model and prints a pass rate, then a multi-turn transcript. If auth/path
+differ, `UNIAI_CHAT_PATH` / `UNIAI_AUTH_SCHEME` are the knobs; try `native` if the model
+supports it; if the request/response body differs materially from OpenAI's, only
 `OpenAICompatClient` needs adapting — the orchestrator, tools, and eval are untouched.
 
-**Tool calling is required.** The whole platform depends on the model selecting typed tools
-(the LLM never writes SQL, never authors a fact). When choosing the model in UniAI, pick one
-with function-calling support.
-
 Fallback: `LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` uses the direct Anthropic SDK path
-(`claude-opus-4-8`), unchanged.
+(`claude-opus-4-8`) — for local comparison only; not a Catalyst deployment.
 
 ## Deploying the backend to AppSail
 
@@ -107,10 +116,11 @@ SQLAlchemy pool want headroom above the 512 default.
 
 | Var | Default | Purpose |
 |---|---|---|
-| `LLM_PROVIDER` | `uniai` | `uniai` (Catalyst gateway) or `anthropic` |
-| `UNIAI_BASE_URL` / `UNIAI_API_KEY` / `UNIAI_MODEL` | — | Catalyst UniAI gateway + BYOK key |
-| `UNIAI_CHAT_PATH` | `/v1/chat/completions` | Gateway path override |
-| `UNIAI_AUTH_SCHEME` | `bearer` | `bearer` or `zoho-oauthtoken` |
+| `LLM_PROVIDER` | `uniai` | `uniai` (Catalyst-hosted LLM) or `anthropic` |
+| `UNIAI_BASE_URL` / `UNIAI_API_KEY` / `UNIAI_MODEL` | — | Catalyst QuickML LLM Serving endpoint + BYOK key |
+| `UNIAI_CHAT_PATH` | `/v1/chat/completions` | Path suffix; set `""` if the endpoint URL is complete |
+| `UNIAI_AUTH_SCHEME` | `bearer` | `bearer` or `zoho-oauthtoken` (QuickML) |
+| `UNIAI_TOOL_MODE` | `prompted` | `prompted` (any model) or `native` (endpoint must support tools) |
 | `ANTHROPIC_API_KEY` | — | Only for `LLM_PROVIDER=anthropic` |
 | `POSTGRES_HOST` … `POSTGRES_PORT` | compose defaults | External Postgres location |
 | `CORS_ORIGINS` | localhost:5173 | Comma-separated; add the Slate domain |

@@ -143,19 +143,26 @@ class AnthropicClient:
 
 
 class OpenAICompatClient:
-    """Calls any OpenAI-chat-completions-compatible endpoint — built for **Zoho Catalyst
-    UniAI** (the hackathon platform's unified AI gateway, BYOK) and equally usable against
-    Catalyst QuickML LLM serving or any other compatible gateway.
+    """Calls a Catalyst-hosted LLM over the OpenAI chat-completions wire format.
 
-    The orchestrator keeps the conversation in Anthropic block format (``tool_use`` blocks in
-    assistant turns, ``tool_result`` blocks in user turns). This client translates that to the
-    OpenAI wire shape per request (``tool_calls`` on assistant messages, ``role: "tool"``
-    result messages) and maps the response back to :class:`LLMResponse`, so the orchestrator
-    is provider-agnostic.
+    Zoho Catalyst is the only cloud we may use, and its native LLM offering is **QuickML
+    LLM Serving** (Qwen 2.5 models, POST endpoint + Zoho OAuth). This client targets that —
+    and any other OpenAI-compatible endpoint — with plain ``httpx`` so the auth and path
+    quirks are configurable: ``auth_scheme`` is ``"bearer"`` or ``"zoho-oauthtoken"`` (the
+    Zoho OAuth header convention QuickML uses), and ``chat_path`` overrides the URL suffix.
 
-    Uses plain ``httpx`` rather than a provider SDK so auth quirks are configurable:
-    ``auth_scheme`` is ``"bearer"`` (``Authorization: Bearer <key>``) or ``"zoho-oauthtoken"``
-    (``Authorization: Zoho-oauthtoken <key>``, the Zoho OAuth convention).
+    **Tool calling has two modes**, because whether Catalyst's serving endpoint exposes
+    OpenAI-style function calling is undocumented and cannot be assumed:
+
+      * ``tool_mode="native"`` — send the tools as ``tools`` and read structured
+        ``tool_calls`` back. Best quality; use it only if the endpoint supports it.
+      * ``tool_mode="prompted"`` — never send ``tools``; instead inject the tool catalogue
+        and a strict JSON protocol into the system prompt, and parse the model's JSON reply
+        into a tool call or a final answer. This works with **any** chat model, so the whole
+        orchestration loop runs on a plain Qwen deployment with no native tool-calling API.
+
+    The orchestrator always speaks Anthropic block format; this client translates to/from the
+    wire shape per request, so the orchestrator, tools, and eval never change.
     """
 
     def __init__(
@@ -165,6 +172,7 @@ class OpenAICompatClient:
         model: str,
         chat_path: str = "/v1/chat/completions",
         auth_scheme: str = "bearer",
+        tool_mode: str = "prompted",
         max_tokens: int = 4096,
         timeout: float = 120.0,
         transport: Any = None,  # httpx transport override, for tests
@@ -177,8 +185,11 @@ class OpenAICompatClient:
             raise RuntimeError("UNIAI_API_KEY is not set")
         if not model:
             raise RuntimeError("UNIAI_MODEL is not set")
+        if tool_mode not in ("native", "prompted"):
+            raise RuntimeError(f"unknown tool_mode '{tool_mode}' (use 'native' or 'prompted')")
         self.model = model
         self.max_tokens = max_tokens
+        self.tool_mode = tool_mode
         self._url = base_url.rstrip("/") + chat_path
         scheme = {"bearer": "Bearer", "zoho-oauthtoken": "Zoho-oauthtoken"}.get(auth_scheme)
         if scheme is None:
@@ -191,8 +202,8 @@ class OpenAICompatClient:
 
     # --- wire-format translation: Anthropic blocks -> OpenAI messages ---
 
-    @staticmethod
-    def _to_openai_messages(system: str, messages: list[Message]) -> list[dict]:
+    def _to_openai_messages(self, system: str, messages: list[Message]) -> list[dict]:
+        prompted = self.tool_mode == "prompted"
         out: list[dict] = [{"role": "system", "content": system}]
         for msg in messages:
             role, content = msg["role"], msg["content"]
@@ -201,37 +212,50 @@ class OpenAICompatClient:
                 continue
             if role == "assistant":
                 text = "".join(b["text"] for b in content if b.get("type") == "text")
-                tool_calls = [
-                    {
-                        "id": b["id"],
-                        "type": "function",
-                        "function": {
-                            "name": b["name"],
-                            "arguments": json.dumps(b["input"]),
-                        },
-                    }
-                    for b in content
-                    if b.get("type") == "tool_use"
-                ]
-                entry: dict = {"role": "assistant", "content": text or None}
-                if tool_calls:
-                    entry["tool_calls"] = tool_calls
-                out.append(entry)
-            else:  # user turn carrying tool_result blocks -> one role:"tool" message each
+                tool_uses = [b for b in content if b.get("type") == "tool_use"]
+                if prompted:
+                    # Replay the model's own choice as the JSON it (would have) emitted, so
+                    # the conversation stays coherent without native tool_calls.
+                    parts = [text] if text else []
+                    for b in tool_uses:
+                        parts.append(json.dumps({"tool": b["name"], "input": b["input"]}))
+                    out.append({"role": "assistant", "content": "\n".join(parts) or "..."})
+                else:
+                    entry: dict = {"role": "assistant", "content": text or None}
+                    if tool_uses:
+                        entry["tool_calls"] = [
+                            {
+                                "id": b["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": b["name"],
+                                    "arguments": json.dumps(b["input"]),
+                                },
+                            }
+                            for b in tool_uses
+                        ]
+                    out.append(entry)
+            else:  # user turn — may carry tool_result blocks
                 plain_parts: list[str] = []
                 for b in content:
                     if b.get("type") == "tool_result":
-                        out.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": b["tool_use_id"],
-                                "content": b["content"],
-                            }
-                        )
+                        if prompted:
+                            # Feed the result back as readable user text (the endpoint may
+                            # not accept role:"tool").
+                            tag = "TOOL ERROR" if b.get("is_error") else "TOOL RESULT"
+                            plain_parts.append(f"{tag}: {b['content']}")
+                        else:
+                            out.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": b["tool_use_id"],
+                                    "content": b["content"],
+                                }
+                            )
                     elif b.get("type") == "text":
                         plain_parts.append(b["text"])
                 if plain_parts:
-                    out.append({"role": "user", "content": "".join(plain_parts)})
+                    out.append({"role": "user", "content": "\n".join(plain_parts)})
         return out
 
     @staticmethod
@@ -249,24 +273,80 @@ class OpenAICompatClient:
             for t in tools
         ]
 
+    @staticmethod
+    def _prompted_system(system: str, tools: list[dict]) -> str:
+        """Augment the system prompt with the tool catalogue + a strict JSON protocol, so a
+        model with no native tool-calling API can still drive the loop."""
+        catalogue = "\n".join(
+            f"- {t['name']}: {t['description']}\n    parameters: {json.dumps(t['input_schema'])}"
+            for t in tools
+        )
+        return (
+            system
+            + "\n\n---\nYou have these tools. To use one, reply with ONLY a JSON object and "
+            "nothing else:\n"
+            '  {"tool": "<tool_name>", "input": { <parameters> }}\n'
+            "To give your final answer to the user, reply with ONLY:\n"
+            '  {"final": "<your answer text>"}\n'
+            "Never output both. Never wrap the JSON in prose, markdown, or code fences. "
+            "Call one tool at a time and wait for its TOOL RESULT before the next step.\n\n"
+            "TOOLS:\n" + catalogue
+        )
+
+    @staticmethod
+    def _parse_prompted(text: str) -> LLMResponse:
+        """Parse a prompted model's reply into a tool call or a final answer. Tolerant of a
+        stray code fence or leading prose; falls back to treating the whole text as the final
+        answer so a non-conforming reply degrades to a plain (tool-free) answer."""
+        blob = text.strip()
+        if blob.startswith("```"):
+            blob = blob.strip("`")
+            blob = blob[blob.find("\n") + 1 :] if "\n" in blob else blob
+        start, end = blob.find("{"), blob.rfind("}")
+        if start != -1 and end > start:
+            try:
+                obj = json.loads(blob[start : end + 1])
+            except json.JSONDecodeError:
+                obj = None
+            if isinstance(obj, dict):
+                if "tool" in obj:
+                    return LLMResponse(
+                        content=[
+                            ToolUseBlock(
+                                id=f"call_{abs(hash(text)) % 10_000_000}",
+                                name=obj["tool"],
+                                input=obj.get("input") or {},
+                            )
+                        ],
+                        stop_reason="tool_use",
+                    )
+                if "final" in obj:
+                    return LLMResponse(
+                        content=[TextBlock(text=str(obj["final"]))], stop_reason="end_turn"
+                    )
+        return LLMResponse(content=[TextBlock(text=text)], stop_reason="end_turn")
+
     def complete(
         self, system: str, messages: list[Message], tools: list[dict]
     ) -> LLMResponse:
+        prompted = self.tool_mode == "prompted"
+        sys_prompt = self._prompted_system(system, tools) if (prompted and tools) else system
         payload: dict = {
             "model": self.model,
-            "messages": self._to_openai_messages(system, messages),
+            "messages": self._to_openai_messages(sys_prompt, messages),
             "max_tokens": self.max_tokens,
         }
-        if tools:
+        if tools and not prompted:
             payload["tools"] = self._to_openai_tools(tools)
         resp = self._http.post(self._url, json=payload)
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"LLM gateway returned {resp.status_code}: {resp.text[:500]}"
-            )
+            raise RuntimeError(f"LLM endpoint returned {resp.status_code}: {resp.text[:500]}")
         body = resp.json()
         choice = body["choices"][0]
         msg = choice["message"]
+
+        if prompted:
+            return self._parse_prompted(msg.get("content") or "")
 
         content: list[ContentBlock] = []
         if msg.get("content"):
@@ -281,18 +361,20 @@ class OpenAICompatClient:
                 )
             )
         finish = choice.get("finish_reason")
-        stop_reason = "tool_use" if (finish == "tool_calls" or msg.get("tool_calls")) else (
-            finish or "end_turn"
-        )
+        if finish == "tool_calls" or msg.get("tool_calls"):
+            stop_reason = "tool_use"
+        else:
+            stop_reason = finish or "end_turn"
         return LLMResponse(content=content, stop_reason=stop_reason)
 
 
 def client_from_settings(settings: Any) -> LLMClient:
     """Build the configured live client. ``llm_provider`` selects the path:
 
-    * ``"uniai"`` (default) — Catalyst UniAI / any OpenAI-compatible gateway, from
-      ``UNIAI_BASE_URL`` / ``UNIAI_API_KEY`` / ``UNIAI_MODEL`` (+ optional
-      ``UNIAI_CHAT_PATH``, ``UNIAI_AUTH_SCHEME``).
+    * ``"uniai"`` (default) — a Catalyst-hosted LLM (QuickML LLM Serving) or any
+      OpenAI-compatible endpoint, from ``UNIAI_BASE_URL`` / ``UNIAI_API_KEY`` /
+      ``UNIAI_MODEL`` (+ optional ``UNIAI_CHAT_PATH``, ``UNIAI_AUTH_SCHEME``,
+      ``UNIAI_TOOL_MODE``).
     * ``"anthropic"`` — direct Anthropic SDK with ``ANTHROPIC_API_KEY``.
 
     Raises RuntimeError with an actionable message when the chosen path is unconfigured.
@@ -310,6 +392,7 @@ def client_from_settings(settings: Any) -> LLMClient:
             model=settings.uniai_model,
             chat_path=settings.uniai_chat_path,
             auth_scheme=settings.uniai_auth_scheme,
+            tool_mode=getattr(settings, "uniai_tool_mode", "prompted"),
         )
     raise RuntimeError(f"unknown LLM_PROVIDER '{provider}' (use 'uniai' or 'anthropic')")
 

@@ -70,9 +70,11 @@ treats `AccusedMasterID` as a stable person identity is a bug.
   PostGIS, pgvector, or pg_trgm, all of which the ER/RBAC/geo core requires
 - Graph: **networkx in-memory**, not Neo4j — datathon scale, renders identically, no sync
 - FastAPI + Pydantic (tool params are Pydantic models)
-- LLM: via **Catalyst UniAI** gateway (BYOK, OpenAI-compat wire format, `LLM_PROVIDER=uniai`,
-  default) — pick a function-calling-capable model there; direct Anthropic
-  (`claude-opus-4-8` orchestration, `claude-sonnet-5` bulk) as the alternate provider path
+- LLM: **Catalyst QuickML LLM Serving** (Qwen 2.5, BYOK, OpenAI-compat wire format,
+  `LLM_PROVIDER=uniai`, default). Tool calling defaults to `prompted` mode (JSON-protocol
+  in-prompt — works on any model, incl. a Qwen deployment with no native tool API); flip
+  `UNIAI_TOOL_MODE=native` if the endpoint supports OpenAI tools. Direct Anthropic
+  (`claude-opus-4-8`) is a local-comparison fallback only.
 - Frontend: React + Vite, MapLibre/deck.gl (map), Cytoscape.js (network graph)
 - Language: Bhashini (MeitY) for Kannada ASR/TTS
 - PDF: Catalyst SmartBrowz (WeasyPrint fallback)
