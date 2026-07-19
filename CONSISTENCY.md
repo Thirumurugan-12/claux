@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ P7✅ — P7a or P8 next, P9 free |
+| P8 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | ER evaluation harness (F1 + collective lift) |
 
 ---
 
@@ -81,7 +81,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P6 | Blocking + pairwise scoring | ✅ | Claude | `er/blocking.py`+`er/scoring.py`; 55k accused→4.58M pairs in ~30s |
 | P7 | Collective resolution ★ | ✅ | Claude | `er/resolve.py`; person_cluster populated, +237 collective lift |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
-| P8 | ER evaluation harness | ⬜ | | **the F1 number for the slide** |
+| P8 | ER evaluation harness | 🟡 | Claude | in progress |
 
 ### Phase 2 — Tool layer and chat
 | | Prompt | Status | By | Notes |
