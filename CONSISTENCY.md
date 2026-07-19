@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P13 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Trend + hotspot tools (app/tools/trends.py): crime_trend, hotspot_scan (DBSCAN + precise/centroid honesty), spatiotemporal_clusters, compare_to_baseline (z-score red-zone), seasonality, zero_fir_flows (CrimeNo category digit). |
+| _(none active)_ | | | | P1,P2,P5–P13,P14 ✅ + Catalyst pivot ✅. 19 tools live in /chat. Next: P13a (events/anomaly) or P19 UI (Slate). |
 
 ---
 
@@ -45,7 +45,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | — | **Entity resolution core** (`person_cluster`) | 🟢 built + measured | P5✅ P6✅ P7✅ P8✅. **Phase 1 done.** B-cubed F1 **0.687** (P 0.83 / R 0.59), pairwise F1 0.372, collective lift **+887** merges vs name-only. |
 | §1 | Conversational AI interface | 🟡 backend live | P9 tools + **P14 orchestration ✅** (POST /chat, tool-calling loop, provenance chain, refusal path). P19 UI ⬜ |
 | §2 | Network / link analysis | 🟢 built | **P12 ✅** — person_network / shortest_path / communities (Louvain, cross-jurisdiction flag) / repeat_offenders over the resolved-person graph. P7a victim overlap ⬜ (extends to victims). |
-| §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
+| §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🟢 built | **P13 ✅** — crime_trend, hotspot_scan (DBSCAN + precise/centroid honesty), spatiotemporal_clusters, compare_to_baseline (red-zone z-score), seasonality, zero_fir_flows. P13a (event calendar + anomaly) ⬜. |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
 | §5 | Offender profiling (MO, risk) | 🔴 not started | P15 MO, P16 undetected-risk, P17 offender-risk — ER foundation ready to build on |
 | §6 | Investigator support (summaries, similar cases, leads) | 🟡 partial | P10✅ (get_case/person/timeline/chargesheet). P10a case-summary, P15 similar-cases, P17 leads ⬜ |
@@ -92,7 +92,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
 | P11 | Compliance tools | ✅ | Claude | `app/tools/compliance.py`; deadline board (148 heinous day-75+) + reg-delay |
 | P12 | Network tools | ✅ | Claude | `app/tools/network.py`; person-level co-offending graph, 4 tools, Cytoscape-ready, cross-jurisdiction detection |
-| P13 | Trend + hotspot tools | ⬜ | | |
+| P13 | Trend + hotspot tools | ✅ | Claude | `app/tools/trends.py`; 6 tools, DBSCAN hotspots w/ precise-vs-centroid honesty, red-zone z-score, CrimeNo category-digit zero-FIR |
 | P13a | Event calendar + anomaly detection | ⬜ | | closes PS1 §3 |
 | P14 | Orchestration loop ★ | ✅ | Claude | `app/api/`; POST /chat + tool-calling loop over catalog, 28/28 eval, injectable LLM client |
 
@@ -162,6 +162,8 @@ most valuable one in the file** — put anything here that would waste the other
 | 2026-07-18 | `cstype` class balance on closed cases ≈ A 36% / B 10% / C 54%. ~23% of all cases are still OPEN (no chargesheet_details row) — those are the P16 prediction targets. | P16 has a usable but imbalanced label; ~11.6k open cases at 50k scale. | Claude |
 | 2026-07-18 | Age drifts ±2y per appearance around the person's true birth year — the ±2y tolerance in PLAN.md §2 stage 4 is calibrated to exactly this. | P6 age-consistency gate should use ±2y (a tighter gate will drop true matches). | Claude |
 | 2026-07-18 | Co-arrest junction: one `arrest_surrender` event covers up to 4 accused; gangs (300 at 50k scale) recur across cases. Zero-FIR (cat 8) ≈ 4%, UDR (cat 3) present. | P7 collective boost and P12 community detection have real edges; P13 zero-FIR flow tool has data. | Claude |
+| 2026-07-19 | **Zero FIRs (cat 8) do NOT model origin≠destination in the synthetic data.** P2 flips the CrimeNo category digit to 8 for ~4% of FIRs but registers them under the SAME district/station as everything else — coords, crime_no, and police_station_id all agree. Verified: 0 of 1,902 zero FIRs have a CrimeNo-embedded district differing from the assigned unit. | `zero_fir_flows` (P13) therefore returns 0 cross-jurisdiction transfers on synthetic data — this is correct, not a bug. The tool computes flow from the real CrimeNo-vs-assigned-unit divergence, so it lights up on real KSP data; it does NOT fabricate a destination. If a richer zero-FIR demo is wanted, P2 must be extended to set a distinct actual-jurisdiction unit (schema-compatible: make crime_no's station differ from police_station_id) — but that needs a re-resolve. Don't "fix" the tool to invent flows. | Claude |
+| 2026-07-19 | hotspot geo: only ~42% of cases carry coordinates (58% null, as flagged). The non-null ones are district-centroid+jitter, not survey-grade. | `hotspot_scan` (P13) clusters precise-coord cases ONLY and reports the excluded centroid-only count openly (coverage block + caveat). Never cluster the null-coord rows at their centroid — 28,970 identical centroid points would create giant fake hotspots. | Claude |
 
 ---
 
@@ -205,6 +207,45 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-19 · Claude (Thiru) · P13
+```
+Did:      Built app/tools/trends.py — the 6 trend/hotspot tools (PLAN §3 tools 11–16),
+          all aggregate + scoped + explicit k-anon:
+          - crime_trend: date_trunc time series (day/week/month/year) + filters.
+          - hotspot_scan: DBSCAN (sklearn) over PRECISE coords only; reports the
+            precise-vs-centroid split openly and excludes null-coord cases from
+            clustering (see geo data-surprise). Added scikit-learn to deps.
+          - spatiotemporal_clusters: (district x daypart) hot cells from incident hour.
+          - compare_to_baseline: per-district recent-window vs baseline z-score, red-zone
+            flag — the proactive-early-warning signal.
+          - seasonality: month-of-year + day-of-week distributions with peaks.
+          - zero_fir_flows: CrimeNo category-digit (8) extraction; genuine cross-juris
+            flow only where CrimeNo district != assigned unit (see zero-FIR surprise).
+          Shared helpers: parse_crime_no (18-digit split), cached district_centroids.
+
+Works:    Live on 50k: crime_trend 55 monthly buckets/50000; hotspot_scan 384 hotspots on
+          21,030 precise (42.1%), 28,970 centroid-only excluded + caveat; spatiotemporal
+          15 cells; compare_to_baseline 13 red zones / 31 districts; seasonality peak
+          month 3 / Sat; zero_fir_flows 1,902 zero FIRs, 0 cross-juris (honest). SP scope
+          verified (district-1 subset). pytest tests/tools/test_trends.py -> 10 passed.
+          Registered (19 tools now). 6 eval questions -> run_eval 38/38. Full suite 149
+          passed, ruff clean.
+
+Broken:   Nothing. Two data truths now logged in Data surprises: (1) synthetic zero FIRs
+          don't model origin!=destination, so zero_fir_flows shows 0 flows — correct, not
+          a bug, real-data-ready. (2) hotspots run on ~42% precise coords only; the rest
+          are centroid-only and reported, never clustered.
+          - k-anon: applied explicitly in each tool for analyst/policymaker (the base
+            class only auto-suppresses when data is a bare list; these return dicts).
+          - 384 hotspots at eps=2km/min=5 is a lot (district-centroid+jitter fragments);
+            sorted by size so the top ones lead. Tune eps_km/min_samples per query.
+
+Next:     P13a (event calendar + anomaly detection) finishes §3, OR P19 (frontend, Slate)
+          to surface the 19 tools + the map/network panes the hotspot/community outputs
+          are already shaped for (Cytoscape for P12, lat/lon clusters for P13). sklearn is
+          now available for P15 (MO clustering) / P16 (risk) / P18 (forecast).
+```
 
 ### 2026-07-19 · Claude (Thiru) · P12
 ```
