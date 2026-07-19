@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P7 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | collective resolution + clustering + persistence |
+| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ P7✅ — P7a or P8 next, P9 free |
 
 ---
 
@@ -50,7 +50,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 |---|---|---|---|---|
 | P5 | Name parsing + normalization ★ | ✅ | Claude | `er/names.py`; 95.6% blocking recall vs P2 corruption |
 | P6 | Blocking + pairwise scoring | ✅ | Claude | `er/blocking.py`+`er/scoring.py`; 55k accused→4.58M pairs in ~30s |
-| P7 | Collective resolution ★ | 🟡 | Claude | in progress |
+| P7 | Collective resolution ★ | ✅ | Claude | `er/resolve.py`; person_cluster populated, +237 collective lift |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
 | P8 | ER evaluation harness | ⬜ | | **the F1 number for the slide** |
 
@@ -333,4 +333,47 @@ Next:     P7 (er/resolve.py) — the ★ novel step. Build the co-offending grap
           person_cluster_member + match_evidence. score_pair() returns the evidence
           dict you persist. P8 then measures F1 vs P2's ground truth (with/without the
           collective boost = the headline delta).
+```
+
+### 2026-07-18 · Claude (Thiru) · P7
+```
+Did:      Built er/graph.py (co-offending graph, networkx) and er/resolve.py
+          (collective resolution + clustering + persistence). Score pairs (P6) ->
+          union-find cluster -> propagate a boost when co-offenders are already
+          resolved to the same person -> re-cluster, 3 rounds. Persists
+          person_cluster / person_cluster_member (with evidence JSONB) /
+          er_review_queue. CLI: `python -m er.run_resolve [--no-persist]`.
+
+Works:    55,716 accused -> 51,873 clusters / 1,201 multi-member, persisted. For ANY
+          cluster the SQL returns each member's signals + collective_boost +
+          shared_resolved_cooffenders (full "why same person" trail). Collective lift
+          = +237 auto-merges from the network over the name-only baseline (this is the
+          number that previews P8's headline). resolve ~61s. pytest tests/er/ -> 40
+          passed (15 new). Full suite 57, ruff clean.
+
+Broken:   Nothing broken. Precision/tuning notes for P8 (which MEASURES this):
+          1. Two DECISIONS I added beyond PLAN §2 to fight transitive over-merge on
+             the tiny synthetic name pool (68 given / 24 patronymic names cause real
+             collisions). Both are principled and both live in the scorer/union-find:
+             (a) patronymic-mismatch PENALTY: both patronymics present but clearly
+                 different (jw < 0.80) => -0.30. Thresholds measured on P2:
+                 corrupted-same >= 0.886, different <= 0.75, so 0.85/0.80 split is clean.
+             (b) cannot-link constraints in union-find: conflicting patronymic phonetic
+                 key, OR cluster birth-year span > 5. est_birth_year = reg_year - age is
+                 ~constant per person (+/-2 age noise), so it's discriminative.
+             These are recorded in "Decisions that deviate from PLAN.md" too.
+          2. Review queue = 479k pairs (synthetic small-pool artifact, as flagged in
+             P6). Persisted via COPY; P21 UI must paginate/sample. On real data far fewer.
+          3. Largest cluster = 24 (was 62 before the constraints). Some residual
+             over-merge remains where two people genuinely share given+patronymic+age
+             band — unavoidable on this pool; P8 will quantify precision. Don't chase it
+             by over-tightening (hurts recall on real repeat offenders).
+
+Next:     P8 (er/evaluate.py) is the direct next step and produces the F1 for the slide:
+          load ground_truth.json, score pairwise + cluster-level P/R/F1, break down
+          misses by corruption type, and measure the collective lift properly (run with
+          propagation off vs on). resolve() already returns auto_merges_base vs _final;
+          reuse ResolveConfig(max_rounds=1, boost_per_cooffender=0) for the off case, or
+          diff base vs final. P7a extends resolution to victims/complainants (same
+          person_cluster namespace) for the victim-offender overlap.
 ```
