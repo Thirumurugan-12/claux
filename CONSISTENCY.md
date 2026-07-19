@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P9 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | tool framework (RBAC + provenance + audit + k-anon) |
+| _(none active)_ | | | | P1,P2,P5–P9 ✅. Phase 2 started. P10/P11/P12 (real tools) or P14 next |
 
 ---
 
@@ -52,7 +52,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
 | §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
 | §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain (P9) + reasoning viz (P19b) ⬜ |
-| §10 | RBAC & audit | 🔴 not started | P9 tool framework (RBAC at tool boundary), P9a governance |
+| §10 | RBAC & audit | 🟢 framework built | P9✅ — RBAC at tool boundary, audit_log, k-anon. P9a (DPDP governance doc) ⬜ |
 
 **Bottom line:** the data + entity-resolution spine — the thing every §2/§5/§6/§8
 feature is uncomputable without — is complete and measured. No end-user-facing PS1
@@ -86,7 +86,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 ### Phase 2 — Tool layer and chat
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P9 | Tool framework ★ | 🟡 | Claude | in progress |
+| P9 | Tool framework ★ | ✅ | Claude | `app/tools/base.py`; RBAC+provenance+audit+k-anon, 2 demo tools |
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
 | P10 | Retrieval tools | ⬜ | | |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
@@ -446,4 +446,44 @@ Next:     Phase 1 (entity resolution) is COMPLETE and measured. Options:
             the whole tool/chat/demo spine. Highest leverage toward a demoable product.
           Recommend P9 next: person_cluster now exists + is measured, so the retrieval/
           network tools (P10/P12) that read it have a real, scored foundation.
+```
+
+### 2026-07-18 · Claude (Thiru) · P9
+```
+Did:      Built the tool framework in app/tools/base.py — the enforcement point for
+          CLAUDE.md's non-negotiable rules. Tool base class (Pydantic params, principal,
+          _run), ToolResult{data, provenance} (provenance structurally mandatory),
+          Principal+Role (PLAN §6), scope resolution via unit.parent_unit recursive CTE
+          + role ladder, k-anonymity (<5 suppressed for analyst/policymaker), audit log
+          (derived.audit_log, added to 02_derived.sql + applied live), ToolRegistry that
+          emits Anthropic tool-use schemas. Two demo tools in app/tools/demo.py:
+          get_case (person-level, scoped) and case_count_by_district (aggregate, k-anon).
+          `python -m app.tools` prints the schemas.
+
+Works:    pytest tests/tools/ -> 10 passed. Demonstrated live: in-scope SHO gets a case
+          with provenance sql_hash; out-of-scope SHO DENIED ("unit 351 outside scope of
+          sho") and logged; policymaker person-tool DENIED and logged; analyst aggregate
+          k-anonymised to >=5. Schemas print as valid JSON. Full suite 74, ruff clean.
+          derived now has 5 tables (added audit_log); test_schema updated.
+
+Broken:   Nothing. Notes for whoever builds P10–P14:
+          - Inherit app/tools/base.Tool. Set person_level=True for tools returning names
+            (auto-denied for analyst/policymaker). Set aggregate=True + count_field="..."
+            for stats tools (auto k-anon). Call self.assert_unit_in_scope() or
+            self.scope_clause() to enforce/filter by the caller's scope. NEVER put RBAC
+            in the prompt or the SQL by hand.
+          - Every _run MUST return ToolResult with real provenance (row_ids + crime_nos).
+            The base class audits every call automatically — don't log yourself.
+          - Registry: register real tools; build_default_registry() in demo.py is a
+            stand-in. P14 calls registry.anthropic_schemas() + registry.call().
+          - The demo tools are throwaway scaffolding proving the base class; P10 replaces
+            them with the real retrieval catalogue (get_case there should read person_cluster
+            for the resolved profile, NOT accused_master_id).
+
+Next:     Phase 2 tool layer is unblocked. P10 (retrieval tools: get_case, search_cases,
+          get_person via person_cluster, timelines), P11 (chargesheet deadline board —
+          highest value-to-effort, pure SQL over the date chain, data already has a
+          day-55-95 cohort), P12 (network tools over the co-offending graph + clusters).
+          P14 (orchestration) is the merge point. Recommend P11 next: insurance-policy
+          feature, fast, and the demo beat "43 cases at day 75+" is already in the data.
 ```
