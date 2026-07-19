@@ -40,10 +40,18 @@ class ScoringWeights:
     geo_adjacent: float = 0.03
     # a name below this similarity contributes nothing (kills coincidental blocks)
     jw_floor: float = 0.80
-    patronymic_floor: float = 0.80
+    # measured on P2 data: corrupted-but-same patronymics score >=0.886, genuinely
+    # different fathers <=0.75, so 0.85 / 0.80 cleanly separates match from mismatch.
+    patronymic_floor: float = 0.85
     alias_floor: float = 0.90
     age_tolerance: int = 2
     age_decay: float = 0.2  # per-year falloff within tolerance: diff 0/1/2 -> 1.0/0.8/0.6
+    # When both patronymics are present but clearly different (below this similarity),
+    # that is evidence *against* a match — two people with different fathers. This is
+    # what stops a common given name (all the "Anand"s) transitively over-merging.
+    # Corrupted-but-same patronymics (Maranna/Marappa) sit well above this threshold.
+    patronymic_mismatch_floor: float = 0.80
+    patronymic_mismatch_penalty: float = 0.30
 
 
 DEFAULT_WEIGHTS = ScoringWeights()
@@ -100,11 +108,13 @@ def score_pair(
         signals["name_jw"] = round(weights.name_jw * name_sim, 4)
     notes["name_jw"] = f"jw={name_sim:.3f}"
 
-    # --- patronymic (both present) ---
+    # --- patronymic (both present): a match is strong, a clear mismatch is a penalty ---
     if a.normalized_patronymic and b.normalized_patronymic:
         patro_sim = _jw(a.normalized_patronymic, b.normalized_patronymic)
         if patro_sim >= weights.patronymic_floor:
             signals["patronymic"] = round(weights.patronymic * patro_sim, 4)
+        elif patro_sim < weights.patronymic_mismatch_floor:
+            signals["patronymic_mismatch"] = -round(weights.patronymic_mismatch_penalty, 4)
         notes["patronymic"] = f"jw={patro_sim:.3f}"
 
     # --- alias overlap (alias of one matches the other's given or alias) ---
@@ -126,7 +136,7 @@ def score_pair(
         signals["geo"] = round(geo, 4)
     notes["geo"] = geo_note
 
-    total = min(1.0, sum(signals.values()))
+    total = max(0.0, min(1.0, sum(signals.values())))
     return ScoredPair(a.idx, b.idx, round(total, 4), signals, notes)
 
 
@@ -153,6 +163,8 @@ def score_value(
         patro_sim = _jw(a.normalized_patronymic, b.normalized_patronymic)
         if patro_sim >= weights.patronymic_floor:
             total += weights.patronymic * patro_sim
+        elif patro_sim < weights.patronymic_mismatch_floor:
+            total -= weights.patronymic_mismatch_penalty
 
     if a.alias_norm or b.alias_norm:
         alias_sim = _best_alias_overlap(a, b)
@@ -175,7 +187,44 @@ def score_value(
     ):
         total += weights.geo_adjacent
 
-    return min(1.0, total)
+    return max(0.0, min(1.0, total))
+
+
+def score_detail(
+    a: PartyRecord,
+    b: PartyRecord,
+    weights: ScoringWeights = DEFAULT_WEIGHTS,
+    adjacency: dict[int, set[int]] | None = None,
+) -> tuple[float, dict[str, float]]:
+    """Score plus the per-signal contribution dict, but without the human-readable
+    ``notes`` f-strings :func:`score_pair` builds. Used to attach evidence to the
+    pairs ER keeps (cluster edges, review queue) without paying the notes cost on the
+    millions of pairs that get thrown away."""
+    if _gender_mismatch(a, b):
+        return 0.0, {"gender_gate": 0.0}
+    signals: dict[str, float] = {}
+
+    name_sim = _jw(a.normalized_given, b.normalized_given)
+    if name_sim >= weights.jw_floor:
+        signals["name_jw"] = round(weights.name_jw * name_sim, 4)
+    if a.normalized_patronymic and b.normalized_patronymic:
+        patro_sim = _jw(a.normalized_patronymic, b.normalized_patronymic)
+        if patro_sim >= weights.patronymic_floor:
+            signals["patronymic"] = round(weights.patronymic * patro_sim, 4)
+        elif patro_sim < weights.patronymic_mismatch_floor:
+            signals["patronymic_mismatch"] = -round(weights.patronymic_mismatch_penalty, 4)
+    if a.alias_norm or b.alias_norm:
+        alias_sim = _best_alias_overlap(a, b)
+        if alias_sim >= weights.alias_floor:
+            signals["alias"] = round(weights.alias * alias_sim, 4)
+    if a.est_birth_year is not None and b.est_birth_year is not None:
+        diff = abs(a.est_birth_year - b.est_birth_year)
+        if diff <= weights.age_tolerance:
+            signals["age"] = round(weights.age * max(0.0, 1 - weights.age_decay * diff), 4)
+    geo, _ = _geo_signal(a, b, weights, adjacency or {})
+    if geo:
+        signals["geo"] = round(geo, 4)
+    return max(0.0, min(1.0, sum(signals.values()))), signals
 
 
 def _best_alias_overlap(a: PartyRecord, b: PartyRecord) -> float:

@@ -72,6 +72,24 @@ def test_name_plus_patronymic_without_age_is_review():
     assert REVIEW_FLOOR <= sp.score < AUTO_MERGE, sp.signals
 
 
+def test_different_patronymic_is_penalized():
+    # same common given name but clearly different fathers -> must NOT auto-merge,
+    # otherwise all the "Anand"s transitively collapse into one cluster
+    a = rec(0, "Anand S/o Honnappa", age=40, station=10, district=5)
+    b = rec(1, "Anand S/o Rangappa", age=40, station=10, district=5)
+    sp = score_pair(a, b)
+    assert sp.score < REVIEW_FLOOR, sp.signals
+    assert "patronymic_mismatch" in sp.signals
+
+
+def test_corrupted_same_patronymic_still_matches():
+    # -appa/-anna drift is the SAME father corrupted, and must still count as a match
+    a = rec(0, "Anand S/o Maranna", age=40, station=10, district=5)
+    b = rec(1, "Anand S/o Marappa", age=40, station=10, district=5)
+    sp = score_pair(a, b)
+    assert "patronymic" in sp.signals and sp.score >= AUTO_MERGE
+
+
 def test_age_beyond_tolerance_drops_age_signal():
     a = rec(0, "Ramesh S/o Krishnappa", age=30)
     b = rec(1, "Ramesh S/o Krishnappa", age=40)  # 10y apart
