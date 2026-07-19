@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P14 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Orchestration loop: FastAPI /chat + Claude tool-calling loop over catalog.build_registry(), injectable LLM client so the loop is testable without a live key |
+| _(none active)_ | | | | P1,P2,P5–P11,P14 ✅. Chat spine is live end-to-end (28/28 eval). Next widen catalogue (P12/P13) or start UI (P19). |
 
 ---
 
@@ -43,7 +43,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 |---|---|---|---|
 | — | **Foundation** (DB, synthetic data) | 🟢 built | P1✅ P2✅. P3 ingest/quality-report ⬜, P4 translation ⬜ |
 | — | **Entity resolution core** (`person_cluster`) | 🟢 built + measured | P5✅ P6✅ P7✅ P8✅. **Phase 1 done.** B-cubed F1 **0.687** (P 0.83 / R 0.59), pairwise F1 0.372, collective lift **+887** merges vs name-only. |
-| §1 | Conversational AI interface | 🔴 not started | needs P9 tools + P14 orchestration + P19 UI |
+| §1 | Conversational AI interface | 🟡 backend live | P9 tools + **P14 orchestration ✅** (POST /chat, tool-calling loop, provenance chain, refusal path). P19 UI ⬜ |
 | §2 | Network / link analysis | 🟡 foundation only | co-offending graph + clusters exist (P7); P7a victim overlap ⬜, P12 network tools ⬜ |
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🔴 not started | P13, P13a |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
@@ -51,7 +51,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | §6 | Investigator support (summaries, similar cases, leads) | 🟡 partial | P10✅ (get_case/person/timeline/chargesheet). P10a case-summary, P15 similar-cases, P17 leads ⬜ |
 | §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
 | §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
-| §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain (P9) + reasoning viz (P19b) ⬜ |
+| §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain surfaced through the chat answer (P14 ✅); reasoning viz (P19b) ⬜ |
 | §10 | RBAC & audit | 🟢 framework built | P9✅ — RBAC at tool boundary, audit_log, k-anon. P9a (DPDP governance doc) ⬜ |
 
 **Bottom line:** the data + entity-resolution spine — the thing every §2/§5/§6/§8
@@ -94,7 +94,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P12 | Network tools | ⬜ | | |
 | P13 | Trend + hotspot tools | ⬜ | | |
 | P13a | Event calendar + anomaly detection | ⬜ | | closes PS1 §3 |
-| P14 | Orchestration loop ★ | ⬜ | | |
+| P14 | Orchestration loop ★ | ✅ | Claude | `app/api/`; POST /chat + tool-calling loop over catalog, 28/28 eval, injectable LLM client |
 
 ### Phase 3 — Intelligence
 | | Prompt | Status | By | Notes |
@@ -201,6 +201,60 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-19 · Claude (Thiru) · P14
+```
+Did:      Built the orchestration loop under app/api/. This is the merge point: the P9
+          tool catalogue (catalog.build_registry) is now a conversation.
+          - llm.py: an LLMClient boundary. AnthropicClient (claude-opus-4-8, adaptive
+            thinking, streaming via .get_final_message) is the production path;
+            ScriptedClient replays authored assistant turns for deterministic offline
+            tests. The orchestrator NEVER imports the SDK — it holds an LLMClient.
+          - orchestrator.py: a MANUAL tool-calling loop (not the SDK tool runner) because
+            every call must pass through ToolRegistry.call, where RBAC/provenance/audit
+            live. Denials become is_error tool_results the model must relay; refusals
+            author no provenance. Loop is an event generator (iter_chat) shared by chat()
+            and the SSE route. System prompt encodes CLAUDE.md's two hard rules.
+          - routes.py: POST /chat (answer + provenance chain + history for multi-turn) and
+            POST /chat/stream (SSE, emits each tool call then the answer). LLM client is a
+            FastAPI dependency, overridable in tests.
+          - eval_set.py + run_eval.py: 28 questions — one per tool, RBAC denials, and
+            unanswerable-must-refuse (financial/vehicle/phone/weather/predict-a-person/
+            opinion) — graded on WHICH tool fired + success/denial, not answer wording.
+            Plus a 3-turn transcript (resolve person -> drill into their case -> refuse a
+            financial question) proving context carry-forward AND the refusal.
+
+Works:    `python -m app.api.run_eval` -> PASS RATE 28/28 = 100% offline, then prints the
+          multi-turn transcript with the provenance crime_nos per turn. `pytest` -> 109
+          passed (14 new in tests/api: loop mechanics, tool_result plumbing/ids, parallel
+          tool calls, RBAC-denial-not-leaked, empty-provenance refusal, multi-turn, the
+          max-rounds valve, and /chat + /chat/stream via TestClient). ruff clean. FastAPI
+          boots; openapi shows /chat + /chat/stream.
+
+Broken:   Nothing. Notes for whoever runs this / builds P19:
+          - The offline eval proves the LOOP (plumbing, provenance, RBAC, refusal). It does
+            NOT prove the model PICKS the right tool — that needs `run_eval --live` with a
+            real key (ANTHROPIC_API_KEY unset here; AnthropicClient also accepts an ambient
+            credential). Same 28 cases, same grader, so it's ready the moment a key exists.
+          - ENV GOTCHA (cost me time): tests/eval need POSTGRES_HOST=localhost — config
+            defaults host to `db` (the docker-compose service name), which doesn't resolve
+            outside compose. Also the project venv is backend/.venv and it did NOT have the
+            anthropic SDK or pip; I ran `.venv/bin/python -m ensurepip` then installed
+            anthropic>=0.40 (added to pyproject deps). System python != the venv.
+          - Added ruff flake8-bugbear extend-immutable-calls for fastapi.Depends/Query/
+            Path/Body so the standard FastAPI default-arg idiom stops tripping B008.
+          - The principal comes from the request body for now. RBAC is at the tool boundary
+            regardless, so a forged principal can only NARROW what's visible. Real auth/SSO
+            wiring is a later concern; documented in routes.py.
+
+Next:     The chat spine is demoable end-to-end. Highest-leverage next:
+          - P12 (network tools) / P13 (trend + hotspot tools) widen the catalogue the loop
+            can already call — every new Tool auto-registers into /chat and needs one line
+            in build_registry + one eval question (test_every_tool_has_a_question enforces
+            this, so an unquestioned tool fails the suite).
+          - P19 (frontend shell) can consume /chat + /chat/stream now.
+          Recommend P13 next (trends close PS1 §3, currently 🔴) then P19 for a visible demo.
+```
 
 ### 2026-07-18 · Claude (Thiru) · P1 verify, P2 claim
 ```
