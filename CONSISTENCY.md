@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P9 ✅. Phase 2 started. P10/P11/P12 (real tools) or P14 next |
+| P11 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | compliance tools (chargesheet board + reg-delay) |
 
 ---
 
@@ -90,7 +90,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
 | P10 | Retrieval tools | ⬜ | | |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
-| P11 | Compliance tools | ⬜ | | chargesheet board — high value |
+| P11 | Compliance tools | 🟡 | Claude | in progress |
 | P12 | Network tools | ⬜ | | |
 | P13 | Trend + hotspot tools | ⬜ | | |
 | P13a | Event calendar + anomaly detection | ⬜ | | closes PS1 §3 |
