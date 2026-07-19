@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P9,P11 ✅. P10/P12/P13 tools or P14 orchestration next |
+| P10 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | retrieval tools (get_case/person/search/timeline) |
 
 ---
 
@@ -88,7 +88,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 |---|---|---|---|---|
 | P9 | Tool framework ★ | ✅ | Claude | `app/tools/base.py`; RBAC+provenance+audit+k-anon, 2 demo tools |
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
-| P10 | Retrieval tools | ⬜ | | |
+| P10 | Retrieval tools | 🟡 | Claude | in progress |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
 | P11 | Compliance tools | ✅ | Claude | `app/tools/compliance.py`; deadline board (148 heinous day-75+) + reg-delay |
 | P12 | Network tools | ⬜ | | |
