@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P19 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Frontend shell (frontend/): dark operational 3-pane UI, streaming chat, evidence drawer w/ clickable CrimeNos, role switcher (RBAC demo). Lightweight SVG network+map panes (P20 upgrades to Cytoscape/MapLibre). |
+| _(none active)_ | | | | P1,P2,P5–P14,P19 ✅ + Catalyst pivot ✅. 19 tools + chat UI. Next: P20 (MapLibre/Cytoscape upgrade) or P15 (MO, sklearn ready). |
 
 ---
 
@@ -43,7 +43,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 |---|---|---|---|
 | — | **Foundation** (DB, synthetic data) | 🟢 built | P1✅ P2✅. P3 ingest/quality-report ⬜, P4 translation ⬜ |
 | — | **Entity resolution core** (`person_cluster`) | 🟢 built + measured | P5✅ P6✅ P7✅ P8✅. **Phase 1 done.** B-cubed F1 **0.687** (P 0.83 / R 0.59), pairwise F1 0.372, collective lift **+887** merges vs name-only. |
-| §1 | Conversational AI interface | 🟡 backend live | P9 tools + **P14 orchestration ✅** (POST /chat, tool-calling loop, provenance chain, refusal path). P19 UI ⬜ |
+| §1 | Conversational AI interface | 🟢 built | P14 orchestration + **P19 UI ✅** — streaming chat, role switcher (RBAC demo), evidence drawer, network/map panes that update from the answer. P20 upgrades panes to MapLibre/Cytoscape. |
 | §2 | Network / link analysis | 🟢 built | **P12 ✅** — person_network / shortest_path / communities (Louvain, cross-jurisdiction flag) / repeat_offenders over the resolved-person graph. P7a victim overlap ⬜ (extends to victims). |
 | §3 | Patterns & trends (spatial/temporal, events, anomalies) | 🟢 built | **P13 ✅** — crime_trend, hotspot_scan (DBSCAN + precise/centroid honesty), spatiotemporal_clusters, compare_to_baseline (red-zone z-score), seasonality, zero_fir_flows. P13a (event calendar + anomaly) ⬜. |
 | §4 | Sociological insights | 🔴 not started | P4a (socioeconomic) — victimisation-side only, offender profiling impossible by schema |
@@ -51,7 +51,7 @@ end to end with `derived.person_cluster` populated (51,873 clusters / 55,716 mem
 | §6 | Investigator support (summaries, similar cases, leads) | 🟡 partial | P10✅ (get_case/person/timeline/chargesheet). P10a case-summary, P15 similar-cases, P17 leads ⬜ |
 | §7 | Financial crime | ⚪ declared out of scope | no account/txn/property/phone data in schema — stub + declare (PLAN §5) |
 | §8 | Forecasting / proactive early-warning | 🔴 not started | P17a alerts (priority), P18 forecast |
-| §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail done (P7); tool provenance chain surfaced through the chat answer (P14 ✅); reasoning viz (P19b) ⬜ |
+| §9 | Explainable AI | 🟡 partial | ER "why same person" evidence trail (P7); provenance chain surfaced in the chat answer (P14) AND the evidence pane with clickable CrimeNos → source FIR (P19 ✅); reasoning-path *node diagram* (P19b) ⬜ |
 | §10 | RBAC & audit | 🟢 framework built | P9✅ — RBAC at tool boundary, audit_log, k-anon. P9a (DPDP governance doc) ⬜ |
 
 **Bottom line:** the data + entity-resolution spine — the thing every §2/§5/§6/§8
@@ -108,7 +108,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 ### Phase 4 — Interface
 | | Prompt | Status | By | Notes |
 |---|---|---|---|---|
-| P19 | Frontend shell ★ | ⬜ | | |
+| P19 | Frontend shell ★ | ✅ | Claude | `frontend/`; dark 3-pane shell, streaming chat, RBAC role switcher, evidence drawer + clickable CrimeNos, SVG network/map panes. `npm run build` clean |
 | P19a | SCRB strategic dashboard | ⬜ | | policymaker persona |
 | P19b | Reasoning path visualization | ⬜ | | closes PS1 §9 |
 | P20 | Map + network panes | ⬜ | | |
@@ -207,6 +207,48 @@ Next:     P7 is unblocked. Don't touch er/names.py until I fix the compound case
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+### 2026-07-19 · Claude (Thiru) · P19 (+ small backend support)
+```
+Did:      Built the frontend shell in frontend/ (React+Vite+TS, dark/dense/operational).
+          - Two-column workspace: streaming chat (left) + a tabbed pane (Evidence /
+            Network / Map) on the right. Asking a question repaints the panes — the
+            "one product" linkage the prompt asks for.
+          - Streaming chat consumes /chat/stream SSE; tool-call chips appear inline as
+            the loop runs; text-only history kept for multi-turn.
+          - Role switcher (SHO/DySP/SP/SCRB Analyst/Policymaker) drives RBAC live:
+            switching role remounts the chat with a new principal, so the SAME question
+            returns different scope. IDs come from a new GET /demo/principals (real
+            unit/district ids from the data).
+          - Evidence pane = provenance chain; every CrimeNo is a chip that opens the FIR
+            via POST /case (get_case + RBAC), incl. honest 403 when out of jurisdiction.
+          - Network pane: lightweight SVG radial graph from get_person_network /
+            find_shortest_path / detect_communities result data. Map pane: SVG hotspot
+            scatter over a Karnataka bbox from hotspot_scan, showing the precise-vs-
+            centroid coverage openly. P20 upgrades these to Cytoscape / MapLibre+deck.gl.
+          Backend support (small): ToolCallRecord/stream now carry the tool result `data`
+          so panes render without re-running tools; GET /demo/principals; POST /case.
+
+Works:    `npm run build` (tsc -b && vite build) clean — 33 modules, 157kB. Live-curled
+          /demo/principals (all 5 roles w/ real ids + readable scope) and /case (returns
+          the FIR). Backend suite 152 passed (3 new route tests: principals, case ok,
+          case out-of-scope 403), ruff clean.
+
+Broken:   Nothing, but the chat itself needs the LLM configured — with UNIAI unset,
+          /chat/stream returns 503 and the UI shows a clear banner (by design). To demo
+          the chat end to end you need the Catalyst QuickML endpoint+key (UNIAI_* ) OR
+          LLM_PROVIDER=anthropic. The panes/evidence/role-switch/case-drawer are all
+          driven by real backend data and work regardless. Proxy target is now
+          VITE_API_TARGET (compose default http://backend:8000; set to the AppSail URL
+          for a Slate deploy).
+
+Next:     P20 (MapLibre+deck.gl map with district boundaries + red-zone pulse; Cytoscape
+            network with role colouring + click-to-load-into-chat) is the direct upgrade
+            of the two placeholder panes — the data contracts (Cytoscape {nodes,edges};
+            hotspot lat/lon + coverage) are already what the tools emit.
+          P19b (reasoning-path node diagram) reuses P20's Cytoscape.
+          P15 (MO fingerprinting) is unblocked — sklearn is installed.
+```
 
 ### 2026-07-19 · Claude (Thiru) · P13
 ```
