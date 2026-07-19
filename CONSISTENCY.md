@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1,P2,P5–P11,P14 ✅. Chat spine is live end-to-end (28/28 eval). Next widen catalogue (P12/P13) or start UI (P19). |
+| Catalyst pivot (P14b) | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-19 | Hackathon partner requirement: host on Zoho Catalyst, LLM via Catalyst UniAI (BYOK) instead of a direct Anthropic key. AppSail backend + Slate frontend + OpenAI-compat gateway client. |
 
 ---
 
