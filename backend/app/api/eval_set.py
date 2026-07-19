@@ -121,6 +121,10 @@ def load_fixtures(session: Session) -> dict:
         .mappings()
         .first()
     )
+    # MO fingerprinting (P15): the largest cluster, if clustering has been run.
+    mo_cluster_id = session.execute(
+        text("SELECT mo_cluster_id FROM derived.mo_cluster ORDER BY size DESC LIMIT 1")
+    ).scalar_one_or_none()
     return {
         "case_master_id": case["case_master_id"],
         "crime_no": case["crime_no"],
@@ -132,6 +136,7 @@ def load_fixtures(session: Session) -> dict:
         "cooffender_a": pair["a"],
         "cooffender_b": pair["b"],
         "cooffender_district": pair["district"],
+        "mo_cluster_id": mo_cluster_id if mo_cluster_id is not None else 0,
     }
 
 
@@ -314,6 +319,31 @@ def build_cases(fx: dict) -> list[EvalCase]:
             Expect.TOOL_OK,
             "zero_fir_flows",
             _use("zero_fir_flows", {"top": 15}, "Zero-FIR distribution follows."),
+        ),
+        # --- MO fingerprinting tools (P15) ------------------------------------
+        EvalCase(
+            "similar_cases",
+            f"Find cases with a similar modus operandi to case {cid}, and how they were solved.",
+            ANALYST,
+            Expect.TOOL_OK,
+            "find_similar_cases",
+            _use(
+                "find_similar_cases",
+                {"case_master_id": cid, "limit": 12},
+                "Similar cases and their outcomes follow.",
+            ),
+        ),
+        EvalCase(
+            "mo_cluster",
+            f"Describe modus-operandi pattern {fx['mo_cluster_id']}.",
+            ANALYST,
+            Expect.TOOL_OK,
+            "get_mo_cluster",
+            _use(
+                "get_mo_cluster",
+                {"mo_cluster_id": fx["mo_cluster_id"]},
+                "Here is the MO pattern.",
+            ),
         ),
         # --- compliance tools --------------------------------------------------
         EvalCase(

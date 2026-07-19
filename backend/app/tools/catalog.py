@@ -9,6 +9,7 @@ from __future__ import annotations
 from app.tools.base import ToolRegistry
 from app.tools.compliance import ChargesheetDeadlineWatchTool, RegistrationDelayReportTool
 from app.tools.demo import CaseCountByDistrictTool
+from app.tools.mo import FindSimilarCasesTool, GetMoClusterTool
 from app.tools.network import (
     DetectCommunitiesTool,
     FindShortestPathTool,
@@ -57,6 +58,9 @@ def build_registry() -> ToolRegistry:
     registry.register(CompareToBaselineTool())
     registry.register(SeasonalityTool())
     registry.register(ZeroFirFlowsTool())
+    # P15 MO fingerprinting tools
+    registry.register(GetMoClusterTool())
+    registry.register(FindSimilarCasesTool())
     # a general aggregate demo tool (kept until a richer trends catalogue lands in P13)
     registry.register(CaseCountByDistrictTool())
     return registry

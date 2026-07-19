@@ -145,3 +145,36 @@ COMMENT ON TABLE audit_log IS
 CREATE INDEX idx_audit_ts ON audit_log(ts);
 CREATE INDEX idx_audit_tool ON audit_log(tool);
 CREATE INDEX idx_audit_denied ON audit_log(denied) WHERE denied;
+
+-- -----------------------------------------------------------------------------
+-- MO fingerprinting (P15) — the modus-operandi layer the KSP schema lacks.
+-- There is no MO field; it is derived by clustering BriefFacts free text. Each
+-- case gets an embedding (pgvector) and a cluster; each cluster carries a label
+-- and its outcome (cstype) mix so find_similar_cases can answer "12 similar
+-- cases, 8 chargesheeted" rather than bare similarity.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE mo_cluster (
+    mo_cluster_id   INTEGER PRIMARY KEY,
+    label           VARCHAR(200) NOT NULL,
+    top_terms       TEXT[] NOT NULL DEFAULT '{}',
+    size            INTEGER NOT NULL,
+    cstype_a        INTEGER NOT NULL DEFAULT 0,   -- chargesheeted
+    cstype_b        INTEGER NOT NULL DEFAULT 0,   -- false case
+    cstype_c        INTEGER NOT NULL DEFAULT 0,   -- undetected
+    cstype_open     INTEGER NOT NULL DEFAULT 0    -- no chargesheet row yet
+);
+COMMENT ON TABLE mo_cluster IS
+  'Derived modus-operandi clusters (P15). label + top_terms describe the pattern; '
+  'the cstype_* columns are the outcome mix that makes similar-case lookup actionable.';
+
+CREATE TABLE case_mo_assignment (
+    case_master_id  INTEGER PRIMARY KEY,
+    mo_cluster_id   INTEGER REFERENCES mo_cluster(mo_cluster_id),  -- NULL = noise/unclustered
+    embedding       vector(128) NOT NULL
+);
+CREATE INDEX idx_case_mo_cluster ON case_mo_assignment(mo_cluster_id);
+CREATE INDEX idx_case_mo_embedding ON case_mo_assignment USING hnsw (embedding vector_cosine_ops);
+COMMENT ON TABLE case_mo_assignment IS
+  'Per-case MO embedding + cluster assignment (P15). embedding is an L2-normalised '
+  'LSA vector; cosine distance (<=>) drives find_similar_cases.';
