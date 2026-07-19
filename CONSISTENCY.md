@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| _(none active)_ | | | | P1✅ P2✅ P5✅ P6✅ — P7 (collective resolution) is next, P9 free |
+| P7 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | collective resolution + clustering + persistence |
 
 ---
 
@@ -50,7 +50,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 |---|---|---|---|---|
 | P5 | Name parsing + normalization ★ | ✅ | Claude | `er/names.py`; 95.6% blocking recall vs P2 corruption |
 | P6 | Blocking + pairwise scoring | ✅ | Claude | `er/blocking.py`+`er/scoring.py`; 55k accused→4.58M pairs in ~30s |
-| P7 | Collective resolution ★ | ⬜ | | |
+| P7 | Collective resolution ★ | 🟡 | Claude | in progress |
 | P7a | Victim-offender overlap | ⬜ | | closes PS1 §2 |
 | P8 | ER evaluation harness | ⬜ | | **the F1 number for the slide** |
 
