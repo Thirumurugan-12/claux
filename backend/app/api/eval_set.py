@@ -99,6 +99,28 @@ def load_fixtures(session: Session) -> dict:
         .mappings()
         .first()
     )
+    # A co-offending pair: two resolved people arrested in the same event, plus the district
+    # of that shared FIR — so an SP of that district has both in scope (network path demo).
+    pair = (
+        session.execute(
+            text(
+                "SELECT p.a AS a, p.b AS b, u.district_id AS district "
+                "FROM ("
+                "  SELECT j.arrest_surrender_id AS eid, "
+                "         min(pcm.person_cluster_id) AS a, max(pcm.person_cluster_id) AS b, "
+                "         min(pcm.case_master_id) AS cmid "
+                "  FROM ksp.inv_arrest_surrender_accused j "
+                "  JOIN derived.person_cluster_member pcm "
+                "    ON pcm.role = 'accused' AND pcm.source_row_id = j.accused_master_id "
+                "  GROUP BY j.arrest_surrender_id "
+                "  HAVING count(DISTINCT pcm.person_cluster_id) >= 2"
+                ") p JOIN ksp.case_master c ON c.case_master_id = p.cmid "
+                "JOIN ksp.unit u ON u.unit_id = c.police_station_id LIMIT 1"
+            )
+        )
+        .mappings()
+        .first()
+    )
     return {
         "case_master_id": case["case_master_id"],
         "crime_no": case["crime_no"],
@@ -107,6 +129,9 @@ def load_fixtures(session: Session) -> dict:
         "person_cluster_id": pcid,
         "person_district_id": pcase["district_id"],
         "person_case_master_id": pcase["case_master_id"],
+        "cooffender_a": pair["a"],
+        "cooffender_b": pair["b"],
+        "cooffender_district": pair["district"],
     }
 
 
@@ -184,6 +209,58 @@ def build_cases(fx: dict) -> list[EvalCase]:
             Expect.TOOL_OK,
             "get_chargesheet_status",
             _use("get_chargesheet_status", {"case_master_id": cid}, "Chargesheet status follows."),
+        ),
+        # --- network tools (P12) ----------------------------------------------
+        EvalCase(
+            "person_network",
+            f"Show me the co-offending network around person cluster {pcid}.",
+            psp,
+            Expect.TOOL_OK,
+            "get_person_network",
+            _use(
+                "get_person_network",
+                {"person_cluster_id": pcid, "depth": 2},
+                "Here is their co-offending network.",
+            ),
+        ),
+        EvalCase(
+            "shortest_path",
+            f"How are person {fx['cooffender_a']} and person {fx['cooffender_b']} connected?",
+            _sp(fx["cooffender_district"]),
+            Expect.TOOL_OK,
+            "find_shortest_path",
+            _use(
+                "find_shortest_path",
+                {
+                    "source_person_cluster_id": fx["cooffender_a"],
+                    "target_person_cluster_id": fx["cooffender_b"],
+                },
+                "They are linked through a shared arrest.",
+            ),
+        ),
+        EvalCase(
+            "communities",
+            "Find co-offending groups that operate across more than one police station.",
+            psp,
+            Expect.TOOL_OK,
+            "detect_communities",
+            _use(
+                "detect_communities",
+                {"min_size": 3, "cross_jurisdiction_only": True},
+                "Cross-jurisdiction groups listed.",
+            ),
+        ),
+        EvalCase(
+            "repeat_offenders",
+            "Who are the most prolific repeat offenders in my jurisdiction?",
+            psp,
+            Expect.TOOL_OK,
+            "get_repeat_offenders",
+            _use(
+                "get_repeat_offenders",
+                {"min_firs": 3, "limit": 10},
+                "The prolific offenders are listed.",
+            ),
         ),
         # --- compliance tools --------------------------------------------------
         EvalCase(

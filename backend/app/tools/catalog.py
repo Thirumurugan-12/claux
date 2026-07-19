@@ -9,6 +9,12 @@ from __future__ import annotations
 from app.tools.base import ToolRegistry
 from app.tools.compliance import ChargesheetDeadlineWatchTool, RegistrationDelayReportTool
 from app.tools.demo import CaseCountByDistrictTool
+from app.tools.network import (
+    DetectCommunitiesTool,
+    FindShortestPathTool,
+    GetPersonNetworkTool,
+    GetRepeatOffendersTool,
+)
 from app.tools.retrieval import (
     GetCaseTimelineTool,
     GetCaseTool,
@@ -31,6 +37,11 @@ def build_registry() -> ToolRegistry:
     # P11 compliance tools
     registry.register(ChargesheetDeadlineWatchTool())
     registry.register(RegistrationDelayReportTool())
+    # P12 network tools (over the resolved-person co-offending graph)
+    registry.register(GetPersonNetworkTool())
+    registry.register(FindShortestPathTool())
+    registry.register(DetectCommunitiesTool())
+    registry.register(GetRepeatOffendersTool())
     # a general aggregate demo tool (kept until a richer trends catalogue lands in P13)
     registry.register(CaseCountByDistrictTool())
     return registry
