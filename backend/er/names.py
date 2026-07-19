@@ -34,9 +34,20 @@ from metaphone import doublemetaphone
 
 # Honorifics stripped from the front of a name (case-insensitive, trailing dot ok).
 HONORIFICS = {
-    "sri", "shri", "smt", "smti", "kum", "kumari", "mr", "mrs", "ms", "dr",
+    "sri",
+    "shri",
+    "smt",
+    "smti",
+    "kum",
+    "kumari",
+    "mr",
+    "mrs",
+    "ms",
+    "dr",
     "s",  # occasional bare "S." abbreviation of Sri
-    "thiru", "selvi", "late",
+    "thiru",
+    "selvi",
+    "late",
 }
 
 # Relation markers introducing a patronymic, longest-first so "son of" wins over "s".
@@ -49,7 +60,7 @@ _RELATION_PATTERNS = [
     (r"daughter\s+of", "D/o"),
     (r"wife\s+of", "W/o"),
     (r"care\s+of", "C/o"),
-    (r"bin", "S/o"),      # Islamic patronymic conventions seen in KA FIRs
+    (r"bin", "S/o"),  # Islamic patronymic conventions seen in KA FIRs
     (r"binte", "D/o"),
 ]
 _RELATION_RE = re.compile(r"\b(" + "|".join(p for p, _ in _RELATION_PATTERNS) + r")\b\.?", re.I)
@@ -72,13 +83,13 @@ class ParsedName:
     given: str
     alias: str | None
     patronymic: str | None
-    relation: str | None                 # canonicalised S/o, D/o, W/o, C/o
+    relation: str | None  # canonicalised S/o, D/o, W/o, C/o
     honorifics: list[str] = field(default_factory=list)
-    script: str = "roman"                # 'kannada' | 'roman' | 'mixed'
-    normalized_given: str = ""           # transliterated, casefolded (for Jaro-Winkler)
+    script: str = "roman"  # 'kannada' | 'roman' | 'mixed'
+    normalized_given: str = ""  # transliterated, casefolded (for Jaro-Winkler)
     normalized_patronymic: str | None = None
-    phonetic_key: str = ""               # blocking key over the first given token
-    patronymic_key: str | None = None    # phonetic key of the patronymic
+    phonetic_key: str = ""  # blocking key over the first given token
+    patronymic_key: str | None = None  # phonetic key of the patronymic
 
     def as_dict(self) -> dict:
         return {
@@ -174,7 +185,7 @@ def parse(name: str | None) -> ParsedName:
     m = _RELATION_RE.search(cleaned)
     if m:
         head = cleaned[: m.start()].strip()
-        patronymic = cleaned[m.end():].strip()
+        patronymic = cleaned[m.end() :].strip()
         patronymic = _LATE_RE.sub("", patronymic).strip() or None
         relation = _canon_relation(m.group(1))
     else:
@@ -214,10 +225,20 @@ def parse(name: str | None) -> ParsedName:
 
 # Applied before Double Metaphone. Order matters: multi-char rules first.
 _DRAVIDIAN_SUBS = [
-    ("chh", "ch"), ("ksh", "k"), ("jn", "gn"), ("zh", "l"),
-    ("bh", "b"), ("dh", "d"), ("gh", "g"), ("jh", "j"), ("kh", "k"),
-    ("ph", "p"), ("th", "t"), ("sh", "s"), ("ch", "c"),
-    ("w", "v"),                        # v/w interchange -> v
+    ("chh", "ch"),
+    ("ksh", "k"),
+    ("jn", "gn"),
+    ("zh", "l"),
+    ("bh", "b"),
+    ("dh", "d"),
+    ("gh", "g"),
+    ("jh", "j"),
+    ("kh", "k"),
+    ("ph", "p"),
+    ("th", "t"),
+    ("sh", "s"),
+    ("ch", "c"),
+    ("w", "v"),  # v/w interchange -> v
 ]
 # Kinship suffixes that vary freely (-appa/-anna/-amma/-aiah/-ayya/-gowda): collapse
 # to root. The consonant class is written a[pnm]a so it still matches AFTER the double
@@ -241,10 +262,10 @@ def dravidian_stem(token: str) -> str:
     for a, b in _DRAVIDIAN_SUBS:
         t = t.replace(a, b)
     t = _DOUBLE_CONSONANT_RE.sub(r"\1", t)
-    stripped = _KINSHIP_SUFFIX_RE.sub("", t)   # drop varying kinship suffix...
+    stripped = _KINSHIP_SUFFIX_RE.sub("", t)  # drop varying kinship suffix...
     if len(stripped) >= _MIN_STEM_AFTER_SUFFIX:  # ...but not off a short name
         t = stripped
-    t = _TRAILING_VOWELS_RE.sub("", t)         # terminal-vowel variation
+    t = _TRAILING_VOWELS_RE.sub("", t)  # terminal-vowel variation
     return t or re.sub(r"[^a-z]", "", to_roman(token).lower())
 
 
