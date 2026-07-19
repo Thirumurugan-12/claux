@@ -28,7 +28,7 @@ Who is working on what, right now. Clear your row when you finish or stop.
 
 | Prompt | Who | Branch | Started | Notes |
 |---|---|---|---|---|
-| P11 | Claude (Thiru) | claude/repo-consistency-review-l93twi | 2026-07-18 | compliance tools (chargesheet board + reg-delay) |
+| _(none active)_ | | | | P1,P2,P5–P9,P11 ✅. P10/P12/P13 tools or P14 orchestration next |
 
 ---
 
@@ -90,7 +90,7 @@ UI (P19+) are not built. Nothing is off track; the per-prompt to-do below is cur
 | P9a | Data protection posture | ⬜ | | closes PS1 §10 |
 | P10 | Retrieval tools | ⬜ | | |
 | P10a | Case summary tool | ⬜ | | closes PS1 §6 |
-| P11 | Compliance tools | 🟡 | Claude | in progress |
+| P11 | Compliance tools | ✅ | Claude | `app/tools/compliance.py`; deadline board (148 heinous day-75+) + reg-delay |
 | P12 | Network tools | ⬜ | | |
 | P13 | Trend + hotspot tools | ⬜ | | |
 | P13a | Event calendar + anomaly detection | ⬜ | | closes PS1 §3 |
@@ -486,4 +486,34 @@ Next:     Phase 2 tool layer is unblocked. P10 (retrieval tools: get_case, searc
           day-55-95 cohort), P12 (network tools over the co-offending graph + clusters).
           P14 (orchestration) is the merge point. Recommend P11 next: insurance-policy
           feature, fast, and the demo beat "43 cases at day 75+" is already in the data.
+```
+
+### 2026-07-18 · Claude (Thiru) · P11
+```
+Did:      Built app/tools/compliance.py on the P9 framework. chargesheet_deadline_watch
+          (default-bail board: arrest + no chargesheet, 90/60-day windows, bucketed by
+          urgency, max_overdue_days bound so stale cases don't drown the signal) and
+          registration_delay_report (per-unit info->registered lag, outlier flagging via
+          mean+z*std, k-anon, integrity caveat). Added app/tools/catalog.py (build_registry
+          — the canonical registry P14 uses); `python -m app.tools` prints its schemas.
+
+Works:    pytest tests/tools/ -> 19 passed (9 new). Live: state-wide board flags 1,720
+          actionable cases (250 critical, 126 warning, 1,344 recently breached); the demo
+          beat "148 heinous cases at day 75+" surfaces. reg-delay flags 9 outlier stations.
+          Full suite 92, ruff clean. RBAC/provenance/audit all inherited & working.
+
+Broken:   Nothing. Notes:
+          - DATA REALISM: P2 leaves ~old open+arrested cases (2022 arrests, no chargesheet)
+            that are 1,600+ days "overdue". Those aren't real default-bail risks (accused
+            released long ago). The board's max_overdue_days (default 45) filters them out;
+            raise it to audit history. If P2 is regenerated, consider closing more old cases.
+          - catalog.build_registry() currently includes the P9 demo get_case. P10 should
+            REPLACE it with a person_cluster-backed get_case/get_person (resolved profile
+            across FIRs), not the accused_master_id demo version.
+
+Next:     P10 (retrieval tools: get_case, search_cases, get_person via person_cluster,
+          get_case_timeline, get_chargesheet_status) is the backbone the chat needs, and
+          person_cluster is now populated + measured so get_person can return the resolved
+          cross-FIR profile. P12 (network tools) also unblocked. P14 (orchestration) is the
+          merge point once a few retrieval tools exist. Recommend P10 next.
 ```
